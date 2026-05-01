@@ -1,0 +1,58 @@
+{
+    "expo": {
+        "name": "Puzzle Pause",
+        "slug": "puzzle-pause-app",
+        "scheme": "puzzlepause",
+        "version": "1.0.0",
+        "orientation": "portrait",
+        "icon": "./assets/app_icon_light.png",
+        "userInterfaceStyle": "automatic",
+        "newArchEnabled": true,
+        "splash": {
+            "image": "./assets/app_splash_light.png",
+            "resizeMode": "contain",
+            "backgroundColor": "#ffffff",
+            "dark": {
+                "image": "./assets/app_splash_dark.png",
+                "backgroundColor": "#0b1220"
+            }
+        },
+        "ios": {
+            "supportsTablet": false,
+            "bundleIdentifier": "app.puzzlepause.mobile",
+            "infoPlist": {
+                "ITSAppUsesNonExemptEncryption": false
+            }
+        },
+        "android": {
+            "package": "app.puzzlepause.mobile",
+            "adaptiveIcon": {
+                "foregroundImage": "./assets/app_icon_android_light.png",
+                "monochromeImage": "./assets/app_icon_android_dark.png",
+                "backgroundColor": "#ffffff"
+            },
+            "edgeToEdgeEnabled": true,
+            "predictiveBackGestureEnabled": false
+        },
+        "web": {
+            "favicon": "./assets/app_icon_light.png"
+        },
+        "plugins": [
+            "expo-router",
+            "expo-secure-store",
+            [
+                "@sentry/react-native",
+                {
+                    "url": "https://sentry.io/"
+                }
+            ]
+        ],
+        "extra": {
+            "router": {},
+            "eas": {
+                "projectId": "2c9f158a-0024-4228-94b0-2447494bfe0c"
+            }
+        },
+        "owner": "puzzle-pause"
+    }
+}
