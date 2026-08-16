@@ -1,0 +1,17 @@
+{
+    "name": "Puzzle Pause",
+    "install": "npm ci",
+    "terminals": [
+        {
+            "name": "metro",
+            "command": "npx expo start --port 8081",
+            "description": "Expo Metro dev server. Open the app in Expo Go (scan the QR) or an iOS/Android simulator. Press i / a in this terminal to launch a simulator."
+        }
+    ],
+    "ports": [
+        {
+            "name": "metro",
+            "port": 8081
+        }
+    ]
+}
