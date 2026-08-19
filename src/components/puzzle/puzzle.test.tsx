@@ -754,6 +754,27 @@ describe('ConnectionsPuzzleView', () => {
         expect(allText(renderer)).toContain('Hint: Fruits');
         expect(allText(renderer)).toContain('Vegetables');
     });
+
+    it('keeps all group buttons when only one category hint is revealed', () => {
+        const renderer = render(
+            <ConnectionsPuzzleView
+                {...interactionProps}
+                puzzle={connectionsPuzzle({
+                    total_hints: 4,
+                    question: {
+                        prompt: 'Group these 12 words into 4 categories of 3:',
+                        items: Array.from({ length: 12 }, (_, index) => `Item ${index + 1}`),
+                    },
+                })}
+                hintsRevealed={['Category A']}
+            />
+        );
+
+        expect(allText(renderer)).toContain('Category A');
+        expect(allText(renderer)).toContain('Group 2');
+        expect(allText(renderer)).toContain('Group 3');
+        expect(allText(renderer)).toContain('Group 4');
+    });
 });
 
 describe('PuzzleRenderer', () => {

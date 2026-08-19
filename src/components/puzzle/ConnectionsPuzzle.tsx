@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import type { ConnectionsPuzzle } from '../../api/schemas';
 import { useTheme } from '../../theme';
@@ -22,6 +22,10 @@ export function ConnectionsPuzzleView({
     const [assignments, setAssignments] = useState<Array<number | null>>(() =>
         puzzle.question.items.map(() => null)
     );
+
+    useEffect(() => {
+        setSelectedGroup((prev) => Math.min(prev, Math.max(groupCount - 1, 0)));
+    }, [groupCount]);
     const { colors, spacing, typography } = useTheme();
     const isComplete = assignments.every((group) => group != null);
 
@@ -142,7 +146,7 @@ function getGroupCount(puzzle: ConnectionsPuzzle): number {
         if (parsedCount >= 2 && puzzle.question.items.length % parsedCount === 0)
             return parsedCount;
     }
-    return 2;
+    return 3;
 }
 
 function getGroupLabel(puzzle: ConnectionsPuzzle, hintsRevealed: string[], index: number): string {
