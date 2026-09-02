@@ -1,5 +1,6 @@
 import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
+import { Alert } from 'react-native';
 import type {
     ChoicePuzzle,
     ClueRevealPuzzle,
@@ -786,7 +787,7 @@ describe('PuzzleRenderer', () => {
         });
     });
 
-    it('offers give up without a confirmation step', () => {
+    it('asks for confirmation before giving up', () => {
         const onGiveUp = vi.fn();
         const renderer = render(
             <PuzzleRenderer {...interactionProps} onGiveUp={onGiveUp} puzzle={textPuzzle()} />
@@ -794,6 +795,22 @@ describe('PuzzleRenderer', () => {
 
         press(findPressableByText(renderer, 'Give up (score 0)')!);
 
+        expect(Alert.alert).toHaveBeenCalledWith(
+            'Give up?',
+            'This will end the puzzle with a score of 0 and reveal the solution.',
+            expect.any(Array)
+        );
+        expect(onGiveUp).not.toHaveBeenCalled();
+
+        const [, , buttons] = vi.mocked(Alert.alert).mock.calls[0] as [
+            string,
+            string,
+            { onPress?: () => void }[],
+        ];
+        buttons[0]!.onPress?.();
+        expect(onGiveUp).not.toHaveBeenCalled();
+
+        buttons[1]!.onPress!();
         expect(onGiveUp).toHaveBeenCalledTimes(1);
     });
 

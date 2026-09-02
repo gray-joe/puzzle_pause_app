@@ -14,7 +14,7 @@ import type {
     WordWheelPuzzle,
     WordsearchPuzzle,
 } from '../../api/schemas';
-import { Text, View } from 'react-native';
+import { Alert, Text, View } from 'react-native';
 import { useTheme } from '../../theme';
 import { Button } from '../Button';
 import { ChoicePuzzleView } from './ChoicePuzzle';
@@ -52,6 +52,16 @@ const SCORING_NOTE =
 export function PuzzleRenderer({ puzzle, ...rest }: Props) {
     const { colors, spacing, typography } = useTheme();
     const isInteractionDisabled = rest.isSubmitting || rest.isHinting || rest.isGivingUp;
+    const confirmGiveUp = () => {
+        Alert.alert(
+            'Give up?',
+            'This will end the puzzle with a score of 0 and reveal the solution.',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Give up', style: 'destructive', onPress: rest.onGiveUp },
+            ]
+        );
+    };
     let content;
     let showScoringNote = true;
 
@@ -117,7 +127,7 @@ export function PuzzleRenderer({ puzzle, ...rest }: Props) {
             <Button
                 title="Give up (score 0)"
                 variant="secondary"
-                onPress={rest.onGiveUp}
+                onPress={confirmGiveUp}
                 loading={rest.isGivingUp}
                 disabled={isInteractionDisabled}
             />

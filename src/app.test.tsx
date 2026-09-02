@@ -169,6 +169,12 @@ function setInfiniteQuery(result: Record<string, unknown>) {
     });
 }
 
+function confirmGiveUp() {
+    const calls = vi.mocked(Alert.alert).mock.calls;
+    const buttons = calls[calls.length - 1]![2] as { onPress?: () => void }[];
+    press({ props: buttons[1] } as Parameters<typeof press>[0]);
+}
+
 function installMutationMock() {
     mocks.useMutation.mockImplementation((options) => ({
         isPending: false,
@@ -598,6 +604,7 @@ describe('today puzzle route', () => {
         const renderer = render(<TodayScreen />);
 
         press(findPressableByText(renderer, 'Give up (score 0)')!);
+        confirmGiveUp();
         press(findPressableByText(renderer, 'Share result')!);
 
         expect(mocks.puzzleGiveUp).toHaveBeenCalledWith('jwt-token', 11);
@@ -633,6 +640,7 @@ describe('today puzzle route', () => {
         const renderer = render(<TodayScreen />);
 
         press(findPressableByText(renderer, 'Give up (score 0)')!);
+        confirmGiveUp();
 
         expect(allText(renderer)).toContain('Try again later');
         expect(findAllByHost(renderer, 'TextInput')).toHaveLength(1);
@@ -660,7 +668,9 @@ describe('today puzzle route', () => {
         const giveUpButton = findPressableByText(renderer, 'Give up (score 0)')!;
 
         press(giveUpButton);
+        confirmGiveUp();
         press(giveUpButton);
+        confirmGiveUp();
 
         expect(mocks.puzzleGiveUp).toHaveBeenCalledTimes(1);
     });
@@ -1067,6 +1077,7 @@ describe('archive routes', () => {
         const renderer = render(<ArchiveDetailScreen />);
 
         press(findPressableByText(renderer, 'Give up (score 0)')!);
+        confirmGiveUp();
         press(findPressableByText(renderer, 'Share result')!);
 
         expect(mocks.archiveGiveUp).toHaveBeenCalledWith('jwt-token', 11);
