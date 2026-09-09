@@ -6,6 +6,7 @@ import { ApiError } from '../api/client';
 import * as puzzleApi from '../api/puzzle';
 import type { AttemptResponse, Puzzle } from '../api/schemas';
 import { useSession } from '../auth/useSession';
+import { PuzzleCompletionStats } from '../components/PuzzleCompletionStats';
 import { PuzzleRenderer } from '../components/puzzle/PuzzleRenderer';
 import { QueryStateView } from '../components/QueryStateView';
 import { Screen } from '../components/Screen';
@@ -16,7 +17,7 @@ import {
     getGuestPuzzleResultAsync,
     setGuestPuzzleResult,
 } from '../lib/guestPuzzleState';
-import { formatPuzzleAnswer } from '../lib/puzzleAnswer';
+import { formatCompletionStats, formatPuzzleAnswer } from '../lib/puzzleAnswer';
 import { buildShareText, shareResult } from '../lib/shareResult';
 import { useTheme } from '../theme';
 
@@ -317,6 +318,7 @@ function ResultView({ puzzle, result }: ResultViewProps) {
     const router = useRouter();
     const { colors, spacing, typography } = useTheme();
     const [didCopy, setDidCopy] = useState(false);
+    const completionStats = formatCompletionStats(puzzle.completion_stats);
 
     useEffect(() => {
         if (!didCopy) return;
@@ -357,6 +359,8 @@ function ResultView({ puzzle, result }: ResultViewProps) {
                 variant="secondary"
                 onPress={handleShare}
             />
+
+            <PuzzleCompletionStats stats={completionStats} />
 
             {!result.gave_up && result.streak != null && result.streak > 0 && (
                 <View style={{ gap: spacing.xs }}>

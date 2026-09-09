@@ -11,6 +11,7 @@ import {
     LeagueResponseSchema,
     PuzzleSchema,
     PuzzleResultSchema,
+    type ChessPuzzle,
     type ChoicePuzzle,
     type ClueRevealPuzzle,
     type ConnectionsPuzzle,
@@ -113,6 +114,34 @@ describe('PuzzleSchema', () => {
             prompt: 'Pick one',
             options: ['A', 'B', 'C', 'D'],
         });
+    });
+
+    it('parses chess puzzles from JSON question content', () => {
+        const fen = 'r1bqkb1r/pppp1ppp/2n2n2/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR w KQkq - 4 4';
+        const parsed = PuzzleSchema.parse({
+            ...basePuzzle,
+            puzzle_type: 'chess',
+            question: JSON.stringify({ fen }),
+        }) as ChessPuzzle;
+
+        expect(parsed.question).toEqual({ fen });
+    });
+
+    it('rejects chess puzzles with invalid or missing question data', () => {
+        expect(
+            PuzzleSchema.safeParse({
+                ...basePuzzle,
+                puzzle_type: 'chess',
+                question: '{not json}',
+            }).success
+        ).toBe(false);
+        expect(
+            PuzzleSchema.safeParse({
+                ...basePuzzle,
+                puzzle_type: 'chess',
+                question: JSON.stringify({}),
+            }).success
+        ).toBe(false);
     });
 
     it('parses clue-reveal puzzles from JSON question content', () => {

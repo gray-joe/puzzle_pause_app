@@ -91,6 +91,7 @@ vi.mock('expo-router', () => {
 
 vi.mock('@expo/vector-icons', () => ({
     Ionicons: nativeComponent('Ionicons'),
+    MaterialCommunityIcons: nativeComponent('MaterialCommunityIcons'),
 }));
 
 vi.mock('expo-status-bar', () => ({

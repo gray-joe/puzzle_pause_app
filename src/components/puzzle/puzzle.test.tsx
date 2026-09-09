@@ -2,6 +2,7 @@ import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { Alert } from 'react-native';
 import type {
+    ChessPuzzle,
     ChoicePuzzle,
     ClueRevealPuzzle,
     ConnectionsPuzzle,
@@ -28,6 +29,7 @@ import {
     submitEditing,
     textContent,
 } from '../../test/render';
+import { ChessPuzzleView } from './ChessPuzzle';
 import { ChoicePuzzleView } from './ChoicePuzzle';
 import { ClueRevealPuzzleView } from './ClueRevealPuzzle';
 import { ConnectionsPuzzleView } from './ConnectionsPuzzle';
@@ -80,6 +82,17 @@ function choicePuzzle(): ChoicePuzzle {
         puzzle_type: 'choice',
         question: { prompt: 'Pick one', options: ['Alpha', 'Beta'] },
     } as ChoicePuzzle;
+}
+
+function chessPuzzle(overrides: Partial<ChessPuzzle> = {}): ChessPuzzle {
+    return {
+        ...basePuzzle,
+        puzzle_type: 'chess',
+        question: {
+            fen: 'r1bqkb1r/pppp1ppp/2n2n2/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR w KQkq - 4 4',
+        },
+        ...overrides,
+    } as ChessPuzzle;
 }
 
 function ladderPuzzle(): LadderPuzzle {
@@ -240,6 +253,82 @@ describe('TextAnswerPuzzle', () => {
         expect(allText(renderer)).toContain('Try again');
         expect(allText(renderer)).toContain('Hint: Think smaller');
         expect(allText(renderer)).toContain('Hint');
+    });
+});
+
+describe('ChessPuzzleView', () => {
+    it('renders the FEN position and submits a tapped move as lowercase UCI', () => {
+        const onSubmit = vi.fn();
+        const renderer = render(
+            <ChessPuzzleView
+                {...interactionProps}
+                puzzle={chessPuzzle()}
+                onSubmit={onSubmit}
+                hintsRevealed={['The queen and bishop both target f7']}
+            />
+        );
+
+        expect(allText(renderer)).toContain('White to move, mate in 1');
+        expect(allText(renderer)).toContain('Hint: The queen and bishop both target f7');
+
+        const square = (label: string) =>
+            findAllByHost(renderer, 'Pressable').find(
+                (node) => node.props.accessibilityLabel === label
+            )!;
+        expect(square('h5, white queen')).toBeDefined();
+        press(square('h5, white queen'));
+        expect(allText(renderer)).toContain('Selected h5. Choose a destination.');
+        press(square('f7, black pawn'));
+        expect(allText(renderer)).toContain('Move: h5 → f7');
+        press(findPressableByText(renderer, 'Submit')!);
+
+        expect(onSubmit).toHaveBeenCalledWith('h5f7');
+    });
+
+    it('uses the FEN side-to-move field for the prompt', () => {
+        const renderer = render(
+            <ChessPuzzleView
+                {...interactionProps}
+                puzzle={chessPuzzle({
+                    question: {
+                        fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1',
+                    },
+                })}
+            />
+        );
+
+        expect(allText(renderer)).toContain('Black to move, mate in 1');
+        expect(findAllByHost(renderer, 'Pressable')[0]?.props.accessibilityLabel).toBe(
+            'h1, white rook'
+        );
+    });
+
+    it('adds the selected promotion piece to the UCI move', () => {
+        const onSubmit = vi.fn();
+        const renderer = render(
+            <ChessPuzzleView
+                {...interactionProps}
+                puzzle={chessPuzzle({
+                    question: { fen: '7k/4P3/8/8/8/8/8/K7 w - - 0 1' },
+                })}
+                onSubmit={onSubmit}
+            />
+        );
+        const square = (label: string) =>
+            findAllByHost(renderer, 'Pressable').find(
+                (node) => node.props.accessibilityLabel === label
+            )!;
+
+        press(square('e7, white pawn'));
+        press(square('e8, empty'));
+
+        expect(allText(renderer)).toContain('Promote to');
+        expect(findPressableByText(renderer, 'Submit')?.props.disabled).toBe(true);
+
+        press(findPressableByText(renderer, 'Queen')!);
+        press(findPressableByText(renderer, 'Submit')!);
+
+        expect(onSubmit).toHaveBeenCalledWith('e7e8q');
     });
 });
 
@@ -772,6 +861,7 @@ describe('PuzzleRenderer', () => {
         [wordsearchPuzzle(), 'Wordsearch'],
         [matchPuzzle(), 'Match each country'],
         [connectionsPuzzle(), 'Group these 9 words'],
+        [chessPuzzle(), 'White to move, mate in 1'],
     ])('renders the matching puzzle view for %s', (puzzle, expectedText) => {
         const renderer = render(<PuzzleRenderer {...interactionProps} puzzle={puzzle as Puzzle} />);
 

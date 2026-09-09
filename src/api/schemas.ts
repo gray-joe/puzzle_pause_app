@@ -34,6 +34,13 @@ export const AttemptStateSchema = z.object({
 });
 export type AttemptState = z.infer<typeof AttemptStateSchema>;
 
+const CompletionStatsSchema = z.object({
+    completion_percentage: z.number(),
+    completed_users: z.number(),
+    average_seconds: z.number().nullable(),
+    average_score: z.number().nullable().optional(),
+});
+
 const PuzzleBase = z.object({
     id: z.number(),
     puzzle_date: z.string(),
@@ -47,6 +54,7 @@ const PuzzleBase = z.object({
     solved: z.boolean().optional(),
     answer: z.string().nullable().optional(),
     explanation: z.string().nullable().optional(),
+    completion_stats: CompletionStatsSchema.nullable().optional(),
 });
 
 const WordPuzzleSchema = z.object({
@@ -91,6 +99,7 @@ const KNOWN_PUZZLE_TYPES = [
     'wordsearch',
     'match',
     'connections',
+    'chess',
 ];
 
 function parseQuestionJson(value: unknown, ctx: z.RefinementCtx): unknown {
@@ -333,6 +342,27 @@ const ConnectionsPuzzleSchema = z.object({
     }),
 });
 
+const chessQuestionSchema = z.object({
+    fen: z.string().min(1),
+});
+
+const ChessPuzzleSchema = z.object({
+    ...PuzzleBase.shape,
+    puzzle_type: z.literal('chess'),
+    question: z.unknown().transform((value, ctx) => {
+        const raw = parseQuestionJson(value, ctx);
+        const result = chessQuestionSchema.safeParse(raw);
+        if (!result.success) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: result.error.issues.map((i) => i.message).join('; '),
+            });
+            return z.NEVER;
+        }
+        return result.data;
+    }),
+});
+
 const clueRevealQuestionSchema = z.object({
     prompt: z.string(),
     clues: z.array(z.string()),
@@ -383,6 +413,7 @@ export const PuzzleSchema = z.union([
     WordsearchPuzzleSchema,
     MatchPuzzleSchema,
     ConnectionsPuzzleSchema,
+    ChessPuzzleSchema,
     ClueRevealPuzzleSchema,
     UnsupportedPuzzleSchema,
 ]);
@@ -401,6 +432,7 @@ export type NumGridPuzzle = z.infer<typeof NumGridPuzzleSchema>;
 export type WordsearchPuzzle = z.infer<typeof WordsearchPuzzleSchema>;
 export type MatchPuzzle = z.infer<typeof MatchPuzzleSchema>;
 export type ConnectionsPuzzle = z.infer<typeof ConnectionsPuzzleSchema>;
+export type ChessPuzzle = z.infer<typeof ChessPuzzleSchema>;
 export type ClueRevealPuzzle = z.infer<typeof ClueRevealPuzzleSchema>;
 export type TextPuzzle = WordPuzzle | MathPuzzle | LadderPuzzle;
 

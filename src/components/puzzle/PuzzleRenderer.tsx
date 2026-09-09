@@ -1,4 +1,5 @@
 import type {
+    ChessPuzzle,
     ChoicePuzzle,
     ClueRevealPuzzle,
     ConnectionsPuzzle,
@@ -17,6 +18,9 @@ import type {
 import { Alert, Text, View } from 'react-native';
 import { useTheme } from '../../theme';
 import { Button } from '../Button';
+import { PuzzleCompletionStats } from '../PuzzleCompletionStats';
+import { formatCompletionStats } from '../../lib/puzzleAnswer';
+import { ChessPuzzleView } from './ChessPuzzle';
 import { ChoicePuzzleView } from './ChoicePuzzle';
 import { ClueRevealPuzzleView } from './ClueRevealPuzzle';
 import { ConnectionsPuzzleView } from './ConnectionsPuzzle';
@@ -106,6 +110,9 @@ export function PuzzleRenderer({ puzzle, ...rest }: Props) {
         case 'connections':
             content = <ConnectionsPuzzleView puzzle={puzzle as ConnectionsPuzzle} {...rest} />;
             break;
+        case 'chess':
+            content = <ChessPuzzleView puzzle={puzzle as ChessPuzzle} {...rest} />;
+            break;
         default:
             content = <UnsupportedPuzzle />;
             showScoringNote = false;
@@ -124,6 +131,7 @@ export function PuzzleRenderer({ puzzle, ...rest }: Props) {
                     {SCORING_NOTE}
                 </Text>
             )}
+            <PuzzleCompletionStats stats={formatCompletionStats(puzzle.completion_stats)} />
             <Button
                 title="Give up (score 0)"
                 variant="secondary"

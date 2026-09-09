@@ -6,6 +6,7 @@ import * as archiveApi from '../../../src/api/archive';
 import { ApiError } from '../../../src/api/client';
 import type { AttemptResponse, Puzzle } from '../../../src/api/schemas';
 import { useSession } from '../../../src/auth/useSession';
+import { PuzzleCompletionStats } from '../../../src/components/PuzzleCompletionStats';
 import { PuzzleRenderer } from '../../../src/components/puzzle/PuzzleRenderer';
 import { QueryStateView } from '../../../src/components/QueryStateView';
 import { Screen } from '../../../src/components/Screen';
@@ -19,7 +20,7 @@ import {
     getGuestPuzzleResultAsync,
     setGuestPuzzleResult,
 } from '../../../src/lib/guestPuzzleState';
-import { formatPuzzleAnswer } from '../../../src/lib/puzzleAnswer';
+import { formatCompletionStats, formatPuzzleAnswer } from '../../../src/lib/puzzleAnswer';
 import { buildShareText, shareResult } from '../../../src/lib/shareResult';
 import { useTheme } from '../../../src/theme';
 
@@ -265,6 +266,10 @@ function ArchiveResultView({ puzzle, result }: ArchiveResultViewProps) {
     const router = useRouter();
     const { colors, spacing, typography } = useTheme();
     const [didCopy, setDidCopy] = useState(false);
+    const [isLoadingRandom, setIsLoadingRandom] = useState(false);
+    const [noUnsolvedLeft, setNoUnsolvedLeft] = useState(false);
+    const token = session?.token ?? null;
+    const completionStats = formatCompletionStats(puzzle.completion_stats);
 
     useEffect(() => {
         if (!didCopy) return;
@@ -275,6 +280,24 @@ function ArchiveResultView({ puzzle, result }: ArchiveResultViewProps) {
     const handleShare = () => {
         shareResult(buildShareText(puzzle, result, 'archive'));
         setDidCopy(true);
+    };
+
+    const handleRandomUnsolved = async () => {
+        if (isLoadingRandom) return;
+        setIsLoadingRandom(true);
+        setNoUnsolvedLeft(false);
+        try {
+            const unsolved = await archiveApi.list(token, { status: 'unsolved' });
+            const candidates = unsolved.filter((p) => p.id !== puzzle.id);
+            if (candidates.length === 0) {
+                setNoUnsolvedLeft(true);
+                return;
+            }
+            const pick = candidates[Math.floor(Math.random() * candidates.length)];
+            router.push(`/archive/${pick.id}` as never);
+        } finally {
+            setIsLoadingRandom(false);
+        }
     };
 
     return (
@@ -305,6 +328,36 @@ function ArchiveResultView({ puzzle, result }: ArchiveResultViewProps) {
                 variant="secondary"
                 onPress={handleShare}
             />
+
+            <PuzzleCompletionStats stats={completionStats} />
+
+            <Pressable
+                onPress={handleRandomUnsolved}
+                disabled={isLoadingRandom}
+                accessibilityRole="button"
+                accessibilityLabel="Jump to a random, unsolved puzzle"
+                style={({ pressed }) => ({
+                    backgroundColor: colors.primary,
+                    borderRadius: 10,
+                    paddingVertical: spacing.sm + 4,
+                    paddingHorizontal: spacing.lg,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 2,
+                    opacity: isLoadingRandom ? 0.5 : pressed ? 0.85 : 1,
+                })}
+            >
+                <Text style={[typography.heading, { color: colors.primaryText }]}>Another?</Text>
+                <Text style={[typography.caption, { color: colors.primaryText }]}>
+                    Jump to a random, unsolved puzzle
+                </Text>
+            </Pressable>
+
+            {noUnsolvedLeft && (
+                <Text style={[typography.caption, { color: colors.textMuted, textAlign: 'center' }]}>
+                    No unsolved puzzles left — nice work!
+                </Text>
+            )}
 
             {result.answer != null && (
                 <View style={{ gap: spacing.xs }}>

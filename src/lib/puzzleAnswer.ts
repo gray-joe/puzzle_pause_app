@@ -90,6 +90,43 @@ function getStringArray(value: unknown): string[] | undefined {
         : undefined;
 }
 
+type CompletionStats = {
+    completion_percentage: number;
+    completed_users: number;
+    average_seconds: number | null;
+    average_score?: number | null;
+};
+
+export type CompletionStatsFormatted = {
+    solvedBy: string;
+    averageScore: string | null;
+    averageTime: string | null;
+};
+
+export function formatCompletionStats(
+    stats: CompletionStats | null | undefined
+): CompletionStatsFormatted | null {
+    if (!stats || stats.completed_users === 0) return null;
+
+    const solvedBy = `${Math.round(stats.completion_percentage)}%`;
+
+    const averageScore =
+        stats.average_score != null ? String(Math.round(stats.average_score)) : null;
+
+    let averageTime: string | null = null;
+    if (stats.average_seconds != null) {
+        const totalSeconds = Math.floor(stats.average_seconds);
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        const parts: string[] = [];
+        if (minutes > 0) parts.push(`${minutes} ${minutes === 1 ? 'minute' : 'minutes'}`);
+        parts.push(`${seconds} ${seconds === 1 ? 'second' : 'seconds'}`);
+        averageTime = parts.join(' ');
+    }
+
+    return { solvedBy, averageScore, averageTime };
+}
+
 function parseConnectionsQuestion(question: string | null | undefined):
     | {
           items: string[];
