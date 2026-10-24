@@ -84,10 +84,17 @@ const ChoicePuzzleSchema = z.object({
     }),
 });
 
+const WordLadderV2PuzzleSchema = z.object({
+    ...PuzzleBase.shape,
+    puzzle_type: z.literal('word-ladder-v2'),
+    question: z.string(),
+});
+
 const KNOWN_PUZZLE_TYPES = [
     'word',
     'math',
     'ladder',
+    'word-ladder-v2',
     'choice',
     'image-word',
     'clue-reveal',
@@ -100,6 +107,12 @@ const KNOWN_PUZZLE_TYPES = [
     'match',
     'connections',
     'chess',
+    'crossword',
+    'sudoku',
+    'codeword',
+    'word-square',
+    'number-square',
+    'canvas',
 ];
 
 function parseQuestionJson(value: unknown, ctx: z.RefinementCtx): unknown {
@@ -110,6 +123,21 @@ function parseQuestionJson(value: unknown, ctx: z.RefinementCtx): unknown {
         ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'question is not valid JSON' });
         return z.NEVER;
     }
+}
+
+function jsonQuestion<T extends z.ZodTypeAny>(schema: T) {
+    return z.unknown().transform((value, ctx): z.output<T> => {
+        const raw = parseQuestionJson(value, ctx);
+        const result = schema.safeParse(raw);
+        if (!result.success) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: result.error.issues.map((i) => i.message).join('; '),
+            });
+            return z.NEVER;
+        }
+        return result.data;
+    });
 }
 
 function isHttpImageUrl(url: string): boolean {
@@ -145,18 +173,7 @@ const imageWordQuestionSchema = z
 const ImageWordPuzzleSchema = z.object({
     ...PuzzleBase.shape,
     puzzle_type: z.literal('image-word'),
-    question: z.unknown().transform((value, ctx) => {
-        const raw = parseQuestionJson(value, ctx);
-        const result = imageWordQuestionSchema.safeParse(raw);
-        if (!result.success) {
-            ctx.addIssue({
-                code: z.ZodIssueCode.custom,
-                message: result.error.issues.map((i) => i.message).join('; '),
-            });
-            return z.NEVER;
-        }
-        return result.data;
-    }),
+    question: jsonQuestion(imageWordQuestionSchema),
 });
 
 const countdownQuestionSchema = z.object({
@@ -169,18 +186,7 @@ const countdownQuestionSchema = z.object({
 const CountdownPuzzleSchema = z.object({
     ...PuzzleBase.shape,
     puzzle_type: z.literal('countdown'),
-    question: z.unknown().transform((value, ctx) => {
-        const raw = parseQuestionJson(value, ctx);
-        const result = countdownQuestionSchema.safeParse(raw);
-        if (!result.success) {
-            ctx.addIssue({
-                code: z.ZodIssueCode.custom,
-                message: result.error.issues.map((i) => i.message).join('; '),
-            });
-            return z.NEVER;
-        }
-        return result.data;
-    }),
+    question: jsonQuestion(countdownQuestionSchema),
 });
 
 const orderQuestionSchema = z.object({
@@ -191,18 +197,7 @@ const orderQuestionSchema = z.object({
 const OrderPuzzleSchema = z.object({
     ...PuzzleBase.shape,
     puzzle_type: z.literal('order'),
-    question: z.unknown().transform((value, ctx) => {
-        const raw = parseQuestionJson(value, ctx);
-        const result = orderQuestionSchema.safeParse(raw);
-        if (!result.success) {
-            ctx.addIssue({
-                code: z.ZodIssueCode.custom,
-                message: result.error.issues.map((i) => i.message).join('; '),
-            });
-            return z.NEVER;
-        }
-        return result.data;
-    }),
+    question: jsonQuestion(orderQuestionSchema),
 });
 
 const wordWheelQuestionSchema = z.object({
@@ -213,18 +208,7 @@ const wordWheelQuestionSchema = z.object({
 const WordWheelPuzzleSchema = z.object({
     ...PuzzleBase.shape,
     puzzle_type: z.literal('word-wheel'),
-    question: z.unknown().transform((value, ctx) => {
-        const raw = parseQuestionJson(value, ctx);
-        const result = wordWheelQuestionSchema.safeParse(raw);
-        if (!result.success) {
-            ctx.addIssue({
-                code: z.ZodIssueCode.custom,
-                message: result.error.issues.map((i) => i.message).join('; '),
-            });
-            return z.NEVER;
-        }
-        return result.data;
-    }),
+    question: jsonQuestion(wordWheelQuestionSchema),
 });
 
 const scrabbleQuestionSchema = z.object({
@@ -237,18 +221,7 @@ const scrabbleQuestionSchema = z.object({
 const ScrabblePuzzleSchema = z.object({
     ...PuzzleBase.shape,
     puzzle_type: z.literal('scrabble'),
-    question: z.unknown().transform((value, ctx) => {
-        const raw = parseQuestionJson(value, ctx);
-        const result = scrabbleQuestionSchema.safeParse(raw);
-        if (!result.success) {
-            ctx.addIssue({
-                code: z.ZodIssueCode.custom,
-                message: result.error.issues.map((i) => i.message).join('; '),
-            });
-            return z.NEVER;
-        }
-        return result.data;
-    }),
+    question: jsonQuestion(scrabbleQuestionSchema),
 });
 
 const numgridQuestionSchema = z
@@ -263,18 +236,7 @@ const numgridQuestionSchema = z
 const NumGridPuzzleSchema = z.object({
     ...PuzzleBase.shape,
     puzzle_type: z.literal('numgrid'),
-    question: z.unknown().transform((value, ctx) => {
-        const raw = parseQuestionJson(value, ctx);
-        const result = numgridQuestionSchema.safeParse(raw);
-        if (!result.success) {
-            ctx.addIssue({
-                code: z.ZodIssueCode.custom,
-                message: result.error.issues.map((i) => i.message).join('; '),
-            });
-            return z.NEVER;
-        }
-        return result.data;
-    }),
+    question: jsonQuestion(numgridQuestionSchema),
 });
 
 const WordsearchPuzzleSchema = z.object({
@@ -298,18 +260,7 @@ const matchQuestionSchema = z
 const MatchPuzzleSchema = z.object({
     ...PuzzleBase.shape,
     puzzle_type: z.literal('match'),
-    question: z.unknown().transform((value, ctx) => {
-        const raw = parseQuestionJson(value, ctx);
-        const result = matchQuestionSchema.safeParse(raw);
-        if (!result.success) {
-            ctx.addIssue({
-                code: z.ZodIssueCode.custom,
-                message: result.error.issues.map((i) => i.message).join('; '),
-            });
-            return z.NEVER;
-        }
-        return result.data;
-    }),
+    question: jsonQuestion(matchQuestionSchema),
 });
 
 const connectionsQuestionSchema = z
@@ -328,18 +279,7 @@ const connectionsQuestionSchema = z
 const ConnectionsPuzzleSchema = z.object({
     ...PuzzleBase.shape,
     puzzle_type: z.literal('connections'),
-    question: z.unknown().transform((value, ctx) => {
-        const raw = parseQuestionJson(value, ctx);
-        const result = connectionsQuestionSchema.safeParse(raw);
-        if (!result.success) {
-            ctx.addIssue({
-                code: z.ZodIssueCode.custom,
-                message: result.error.issues.map((i) => i.message).join('; '),
-            });
-            return z.NEVER;
-        }
-        return result.data;
-    }),
+    question: jsonQuestion(connectionsQuestionSchema),
 });
 
 const chessQuestionSchema = z.object({
@@ -349,18 +289,161 @@ const chessQuestionSchema = z.object({
 const ChessPuzzleSchema = z.object({
     ...PuzzleBase.shape,
     puzzle_type: z.literal('chess'),
-    question: z.unknown().transform((value, ctx) => {
-        const raw = parseQuestionJson(value, ctx);
-        const result = chessQuestionSchema.safeParse(raw);
-        if (!result.success) {
-            ctx.addIssue({
-                code: z.ZodIssueCode.custom,
-                message: result.error.issues.map((i) => i.message).join('; '),
-            });
-            return z.NEVER;
-        }
-        return result.data;
+    question: jsonQuestion(chessQuestionSchema),
+});
+
+const crosswordQuestionSchema = z
+    .object({
+        prompt: z.string(),
+        layout: z
+            .array(z.string().regex(/^[.#]{3,15}$/))
+            .min(3)
+            .max(15),
+        clues: z.object({
+            across: z.record(z.string(), z.string()),
+            down: z.record(z.string(), z.string()),
+        }),
+    })
+    .refine((data) => data.layout.every((row) => row.length === data.layout[0]!.length), {
+        message: 'layout rows must have equal length',
+    });
+
+const CrosswordPuzzleSchema = z.object({
+    ...PuzzleBase.shape,
+    puzzle_type: z.literal('crossword'),
+    question: jsonQuestion(crosswordQuestionSchema),
+});
+
+const SudokuPuzzleSchema = z.object({
+    ...PuzzleBase.shape,
+    puzzle_type: z.literal('sudoku'),
+    question: jsonQuestion(z.object({ prompt: z.string(), grid: z.string().regex(/^[0-9]{81}$/) })),
+});
+
+const codewordQuestionSchema = z
+    .object({
+        prompt: z.string(),
+        cells: z
+            .array(z.array(z.number().int().min(0).max(26)).min(3).max(15))
+            .min(3)
+            .max(15),
+        givens: z.record(z.string(), z.string().regex(/^[A-Za-z]$/)),
+    })
+    .refine((data) => data.cells.every((row) => row.length === data.cells[0]!.length), {
+        message: 'cells must be rectangular',
+    });
+
+const CodewordPuzzleSchema = z.object({
+    ...PuzzleBase.shape,
+    puzzle_type: z.literal('codeword'),
+    question: jsonQuestion(codewordQuestionSchema),
+});
+
+const wordSquareQuestionSchema = z
+    .object({
+        prompt: z.string(),
+        size: z.number().int().min(3).max(6),
+        clues: z.array(z.string()),
+    })
+    .refine((data) => data.clues.length === data.size, {
+        message: 'clues must have one entry per row',
+    });
+
+const WordSquarePuzzleSchema = z.object({
+    ...PuzzleBase.shape,
+    puzzle_type: z.literal('word-square'),
+    question: jsonQuestion(wordSquareQuestionSchema),
+});
+
+const numberSquareOpSchema = z.enum(['+', '-', '*', '/']);
+const numberSquareOpsSchema = z
+    .array(z.tuple([numberSquareOpSchema, numberSquareOpSchema]))
+    .length(3);
+
+const NumberSquarePuzzleSchema = z.object({
+    ...PuzzleBase.shape,
+    puzzle_type: z.literal('number-square'),
+    question: jsonQuestion(
+        z.object({
+            prompt: z.string(),
+            cells: z.array(z.number().nullable()).length(9),
+            row_ops: numberSquareOpsSchema,
+            col_ops: numberSquareOpsSchema,
+            row_results: z.array(z.number()).length(3),
+            col_results: z.array(z.number()).length(3),
+        })
+    ),
+});
+
+const canvasColorSchema = z.union([
+    z.string().regex(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i),
+    z.literal('none'),
+]);
+const canvasPaintSchema = {
+    fill: canvasColorSchema.optional(),
+    stroke: canvasColorSchema.optional(),
+    strokeWidth: z.number().min(0).max(50).optional(),
+};
+
+const canvasShapeSchema = z.discriminatedUnion('type', [
+    z.object({
+        type: z.literal('rect'),
+        x: z.number(),
+        y: z.number(),
+        w: z.number(),
+        h: z.number(),
+        ...canvasPaintSchema,
     }),
+    z.object({
+        type: z.literal('ellipse'),
+        cx: z.number(),
+        cy: z.number(),
+        rx: z.number(),
+        ry: z.number(),
+        ...canvasPaintSchema,
+    }),
+    z.object({
+        type: z.literal('line'),
+        x1: z.number(),
+        y1: z.number(),
+        x2: z.number(),
+        y2: z.number(),
+        arrow: z.boolean().optional(),
+        ...canvasPaintSchema,
+    }),
+    z.object({
+        type: z.literal('path'),
+        points: z.array(z.tuple([z.number(), z.number()])).min(2),
+        ...canvasPaintSchema,
+    }),
+    z.object({
+        type: z.literal('text'),
+        x: z.number(),
+        y: z.number(),
+        text: z.string(),
+        size: z.number(),
+        ...canvasPaintSchema,
+    }),
+]);
+export type CanvasShape = z.infer<typeof canvasShapeSchema>;
+
+const CanvasPuzzleSchema = z.object({
+    ...PuzzleBase.shape,
+    puzzle_type: z.literal('canvas'),
+    question: jsonQuestion(
+        z.object({
+            prompt: z.string(),
+            background: canvasColorSchema.optional().catch(undefined),
+            alt: z.string().optional(),
+            // Unknown or malformed shapes are skipped so new shape types don't break the puzzle.
+            shapes: z.array(z.unknown()).transform((shapes) =>
+                shapes.flatMap((shape) => {
+                    const result = canvasShapeSchema.safeParse(shape);
+                    return result.success ? [result.data] : [];
+                })
+            ),
+        })
+    ),
 });
 
 const clueRevealQuestionSchema = z.object({
@@ -371,24 +454,7 @@ const clueRevealQuestionSchema = z.object({
 const ClueRevealPuzzleSchema = z.object({
     ...PuzzleBase.shape,
     puzzle_type: z.literal('clue-reveal'),
-    question: z.string().transform((s, ctx) => {
-        let raw: unknown;
-        try {
-            raw = JSON.parse(s);
-        } catch {
-            ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'question is not valid JSON' });
-            return z.NEVER;
-        }
-        const result = clueRevealQuestionSchema.safeParse(raw);
-        if (!result.success) {
-            ctx.addIssue({
-                code: z.ZodIssueCode.custom,
-                message: result.error.issues.map((i) => i.message).join('; '),
-            });
-            return z.NEVER;
-        }
-        return result.data;
-    }),
+    question: jsonQuestion(clueRevealQuestionSchema),
 });
 
 const UnsupportedPuzzleSchema = z.object({
@@ -403,6 +469,7 @@ export const PuzzleSchema = z.union([
     WordPuzzleSchema,
     MathPuzzleSchema,
     LadderPuzzleSchema,
+    WordLadderV2PuzzleSchema,
     ChoicePuzzleSchema,
     ImageWordPuzzleSchema,
     CountdownPuzzleSchema,
@@ -414,6 +481,12 @@ export const PuzzleSchema = z.union([
     MatchPuzzleSchema,
     ConnectionsPuzzleSchema,
     ChessPuzzleSchema,
+    CrosswordPuzzleSchema,
+    SudokuPuzzleSchema,
+    CodewordPuzzleSchema,
+    WordSquarePuzzleSchema,
+    NumberSquarePuzzleSchema,
+    CanvasPuzzleSchema,
     ClueRevealPuzzleSchema,
     UnsupportedPuzzleSchema,
 ]);
@@ -422,6 +495,7 @@ export type Puzzle = z.infer<typeof PuzzleSchema>;
 export type WordPuzzle = z.infer<typeof WordPuzzleSchema>;
 export type MathPuzzle = z.infer<typeof MathPuzzleSchema>;
 export type LadderPuzzle = z.infer<typeof LadderPuzzleSchema>;
+export type WordLadderV2Puzzle = z.infer<typeof WordLadderV2PuzzleSchema>;
 export type ChoicePuzzle = z.infer<typeof ChoicePuzzleSchema>;
 export type ImageWordPuzzle = z.infer<typeof ImageWordPuzzleSchema>;
 export type CountdownPuzzle = z.infer<typeof CountdownPuzzleSchema>;
@@ -434,6 +508,12 @@ export type MatchPuzzle = z.infer<typeof MatchPuzzleSchema>;
 export type ConnectionsPuzzle = z.infer<typeof ConnectionsPuzzleSchema>;
 export type ChessPuzzle = z.infer<typeof ChessPuzzleSchema>;
 export type ClueRevealPuzzle = z.infer<typeof ClueRevealPuzzleSchema>;
+export type CrosswordPuzzle = z.infer<typeof CrosswordPuzzleSchema>;
+export type SudokuPuzzle = z.infer<typeof SudokuPuzzleSchema>;
+export type CodewordPuzzle = z.infer<typeof CodewordPuzzleSchema>;
+export type WordSquarePuzzle = z.infer<typeof WordSquarePuzzleSchema>;
+export type NumberSquarePuzzle = z.infer<typeof NumberSquarePuzzleSchema>;
+export type CanvasPuzzle = z.infer<typeof CanvasPuzzleSchema>;
 export type TextPuzzle = WordPuzzle | MathPuzzle | LadderPuzzle;
 
 // POST /puzzle/attempt response

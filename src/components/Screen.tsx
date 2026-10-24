@@ -36,6 +36,8 @@ export function Screen({
                 <ScrollView
                     contentContainerStyle={{ flexGrow: 1, padding: padded ? spacing.md : 0 }}
                     keyboardShouldPersistTaps="handled"
+                    keyboardDismissMode="interactive"
+                    automaticallyAdjustKeyboardInsets
                     refreshControl={
                         onRefresh ? (
                             <RefreshControl

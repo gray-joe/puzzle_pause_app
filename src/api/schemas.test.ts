@@ -92,16 +92,19 @@ describe('AttemptStateSchema', () => {
 });
 
 describe('PuzzleSchema', () => {
-    it.each(['word', 'math', 'ladder'] as const)('parses %s text puzzles', (puzzleType) => {
-        const parsed = PuzzleSchema.parse({
-            ...basePuzzle,
-            puzzle_type: puzzleType,
-            question: '<p>Solve me</p>',
-        });
+    it.each(['word', 'math', 'ladder', 'word-ladder-v2'] as const)(
+        'parses %s text puzzles',
+        (puzzleType) => {
+            const parsed = PuzzleSchema.parse({
+                ...basePuzzle,
+                puzzle_type: puzzleType,
+                question: '<p>Solve me</p>',
+            });
 
-        expect(parsed.puzzle_type).toBe(puzzleType);
-        expect(parsed.question).toBe('<p>Solve me</p>');
-    });
+            expect(parsed.puzzle_type).toBe(puzzleType);
+            expect(parsed.question).toBe('<p>Solve me</p>');
+        }
+    );
 
     it('parses choice puzzles from pipe-delimited question content', () => {
         const parsed = PuzzleSchema.parse({

@@ -64,6 +64,16 @@ vi.mock('react-native', () => ({
     useWindowDimensions: vi.fn(() => ({ width: 360, height: 640, scale: 2, fontScale: 1 })),
 }));
 
+vi.mock('react-native-svg', () => ({
+    default: nativeComponent('Svg'),
+    Ellipse: nativeComponent('Ellipse'),
+    Line: nativeComponent('Line'),
+    Polygon: nativeComponent('Polygon'),
+    Polyline: nativeComponent('Polyline'),
+    Rect: nativeComponent('Rect'),
+    Text: nativeComponent('SvgText'),
+}));
+
 vi.mock('react-native-safe-area-context', () => ({
     SafeAreaProvider: nativeComponent('SafeAreaProvider'),
     SafeAreaView: nativeComponent('SafeAreaView'),

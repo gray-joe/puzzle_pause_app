@@ -15,6 +15,7 @@ import type {
     Puzzle,
     ScrabblePuzzle,
     TextPuzzle,
+    WordLadderV2Puzzle,
     WordWheelPuzzle,
     WordsearchPuzzle,
 } from '../../api/schemas';
@@ -42,6 +43,7 @@ import { OrderPuzzleView } from './OrderPuzzle';
 import { PuzzleRenderer, type PuzzleInteractionProps } from './PuzzleRenderer';
 import { ScrabblePuzzleView } from './ScrabblePuzzle';
 import { TextAnswerPuzzle } from './TextAnswerPuzzle';
+import { WordLadderV2PuzzleView } from './WordLadderV2Puzzle';
 import { WordWheelPuzzleView } from './WordWheelPuzzle';
 import { WordsearchPuzzleView } from './WordsearchPuzzle';
 
@@ -98,8 +100,16 @@ function chessPuzzle(overrides: Partial<ChessPuzzle> = {}): ChessPuzzle {
 function ladderPuzzle(): LadderPuzzle {
     return textPuzzle({
         puzzle_type: 'ladder',
-        question: '<p>CAT<br>___<br>___<br>___<br>___<br>DOG</p>',
+        question: 'cat, ____, ____, dog',
     }) as LadderPuzzle;
+}
+
+function wordLadderV2Puzzle(): WordLadderV2Puzzle {
+    return {
+        ...basePuzzle,
+        puzzle_type: 'word-ladder-v2',
+        question: 'cold, warm',
+    } as WordLadderV2Puzzle;
 }
 
 function cluePuzzle(): ClueRevealPuzzle {
@@ -364,24 +374,29 @@ describe('ChoicePuzzleView', () => {
 });
 
 describe('LadderPuzzleView', () => {
-    it('submits four trimmed ladder steps as the expected answer chain', () => {
+    it('submits only the blank steps, in order, as the answer', () => {
         const onSubmit = vi.fn();
         const renderer = render(
             <LadderPuzzleView {...interactionProps} puzzle={ladderPuzzle()} onSubmit={onSubmit} />
         );
         const inputs = findAllByHost(renderer, 'TextInput');
 
+        expect(inputs).toHaveLength(2);
         changeText(inputs[0]!, '  cot ');
-        changeText(inputs[1]!, ' dot');
-        changeText(inputs[2]!, ' dig ');
-        changeText(inputs[3]!, 'dug');
+        changeText(inputs[1]!, ' cog');
         press(findPressableByText(renderer, 'Submit')!);
 
-        expect(inputs).toHaveLength(4);
-        expect(onSubmit).toHaveBeenCalledWith('cot,dot,dig,dug');
+        expect(onSubmit).toHaveBeenCalledWith('cot, cog');
     });
 
-    it('requires all ladder steps before submitting', () => {
+    it('shows the known words alongside the blanks', () => {
+        const renderer = render(<LadderPuzzleView {...interactionProps} puzzle={ladderPuzzle()} />);
+
+        expect(allText(renderer)).toContain('cat');
+        expect(allText(renderer)).toContain('dog');
+    });
+
+    it('requires all ladder blanks before submitting', () => {
         const renderer = render(
             <LadderPuzzleView
                 {...interactionProps}
@@ -392,9 +407,102 @@ describe('LadderPuzzleView', () => {
         );
 
         expect(findPressableByText(renderer, 'Submit')?.props.disabled).toBe(true);
-        expect(allText(renderer)).toContain('Step 1');
+        expect(allText(renderer)).toContain('Blank 1');
         expect(allText(renderer)).toContain('Not quite');
         expect(allText(renderer)).toContain('Hint: Change one letter each step');
+    });
+});
+
+describe('WordLadderV2PuzzleView', () => {
+    it('builds a word chain one step at a time and submits the intermediate words', () => {
+        const onSubmit = vi.fn();
+        const renderer = render(
+            <WordLadderV2PuzzleView
+                {...interactionProps}
+                puzzle={wordLadderV2Puzzle()}
+                onSubmit={onSubmit}
+            />
+        );
+
+        expect(allText(renderer)).toContain('COLD');
+        expect(allText(renderer)).toContain('WARM');
+        expect(findPressableByText(renderer, 'Submit')?.props.disabled).toBe(true);
+
+        const input = () => findByHost(renderer, 'TextInput');
+
+        changeText(input(), 'cord');
+        press(findPressableByText(renderer, 'Add word')!);
+        changeText(input(), 'card');
+        press(findPressableByText(renderer, 'Add word')!);
+        changeText(input(), 'ward');
+        press(findPressableByText(renderer, 'Add word')!);
+        press(findPressableByText(renderer, 'Submit')!);
+
+        expect(onSubmit).toHaveBeenCalledWith('CORD, CARD, WARD');
+    });
+
+    it('disables adding a word that does not differ from the chain by exactly one letter', () => {
+        const renderer = render(
+            <WordLadderV2PuzzleView {...interactionProps} puzzle={wordLadderV2Puzzle()} />
+        );
+
+        changeText(findByHost(renderer, 'TextInput'), 'cats');
+
+        expect(findPressableByText(renderer, 'Add word')?.props.disabled).toBe(true);
+        expect(allText(renderer)).toContain('Change exactly one letter from COLD');
+    });
+
+    it('removes the last word from the chain, disabling submit again', () => {
+        const renderer = render(
+            <WordLadderV2PuzzleView {...interactionProps} puzzle={wordLadderV2Puzzle()} />
+        );
+
+        for (const word of ['cord', 'card', 'ward']) {
+            changeText(findByHost(renderer, 'TextInput'), word);
+            press(findPressableByText(renderer, 'Add word')!);
+        }
+        expect(findPressableByText(renderer, 'Submit')?.props.disabled).toBe(false);
+
+        press(findPressableByText(renderer, 'Remove last')!);
+
+        expect(findPressableByText(renderer, 'Submit')?.props.disabled).toBe(true);
+    });
+
+    it('keeps submit disabled until the last word is one letter from the end word', () => {
+        const onSubmit = vi.fn();
+        const renderer = render(
+            <WordLadderV2PuzzleView
+                {...interactionProps}
+                puzzle={wordLadderV2Puzzle()}
+                onSubmit={onSubmit}
+            />
+        );
+
+        changeText(findByHost(renderer, 'TextInput'), 'cord');
+        press(findPressableByText(renderer, 'Add word')!);
+        expect(findPressableByText(renderer, 'Submit')?.props.disabled).toBe(true);
+
+        for (const word of ['card', 'ward', 'warm']) {
+            changeText(findByHost(renderer, 'TextInput'), word);
+            press(findPressableByText(renderer, 'Add word')!);
+        }
+        press(findPressableByText(renderer, 'Submit')!);
+
+        expect(onSubmit).toHaveBeenCalledWith('CORD, CARD, WARD, WARM');
+    });
+
+    it('displays hints and submit errors', () => {
+        const renderer = render(
+            <WordLadderV2PuzzleView
+                {...interactionProps}
+                puzzle={wordLadderV2Puzzle()}
+                submitError="Not quite"
+                hintsRevealed={['Think about temperature']}
+            />
+        );
+
+        expect(allText(renderer)).toContain('Not quite');
+        expect(allText(renderer)).toContain('Hint: Think about temperature');
     });
 });
 
@@ -849,7 +957,8 @@ describe('ConnectionsPuzzleView', () => {
 describe('PuzzleRenderer', () => {
     it.each([
         [textPuzzle(), 'Your answer'],
-        [ladderPuzzle(), 'Step 1'],
+        [ladderPuzzle(), 'Blank 1'],
+        [wordLadderV2Puzzle(), 'COLD'],
         [choicePuzzle(), 'Pick one'],
         [imagePuzzle(), 'Name this image'],
         [cluePuzzle(), 'Who am I?'],

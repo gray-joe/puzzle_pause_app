@@ -20,7 +20,8 @@ import {
     getGuestPuzzleResultAsync,
     setGuestPuzzleResult,
 } from '../../../src/lib/guestPuzzleState';
-import { formatCompletionStats, formatPuzzleAnswer } from '../../../src/lib/puzzleAnswer';
+import { formatCompletionStats } from '../../../src/lib/puzzleAnswer';
+import { PuzzleAnswer } from '../../../src/components/puzzle/PuzzleAnswer';
 import { buildShareText, shareResult } from '../../../src/lib/shareResult';
 import { useTheme } from '../../../src/theme';
 
@@ -354,7 +355,9 @@ function ArchiveResultView({ puzzle, result }: ArchiveResultViewProps) {
             </Pressable>
 
             {noUnsolvedLeft && (
-                <Text style={[typography.caption, { color: colors.textMuted, textAlign: 'center' }]}>
+                <Text
+                    style={[typography.caption, { color: colors.textMuted, textAlign: 'center' }]}
+                >
                     No unsolved puzzles left — nice work!
                 </Text>
             )}
@@ -362,9 +365,11 @@ function ArchiveResultView({ puzzle, result }: ArchiveResultViewProps) {
             {result.answer != null && (
                 <View style={{ gap: spacing.xs }}>
                     <Text style={[typography.caption, { color: colors.textMuted }]}>Answer</Text>
-                    <Text style={[typography.body, { color: colors.text }]}>
-                        {formatPuzzleAnswer(puzzle, result.answer, result.question)}
-                    </Text>
+                    <PuzzleAnswer
+                        puzzle={puzzle}
+                        answer={result.answer}
+                        answerQuestion={result.question}
+                    />
                 </View>
             )}
 

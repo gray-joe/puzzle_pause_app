@@ -1,17 +1,24 @@
 import type {
+    CanvasPuzzle,
     ChessPuzzle,
     ChoicePuzzle,
     ClueRevealPuzzle,
+    CodewordPuzzle,
     ConnectionsPuzzle,
     CountdownPuzzle,
+    CrosswordPuzzle,
     ImageWordPuzzle,
     LadderPuzzle,
     MatchPuzzle,
+    NumberSquarePuzzle,
     NumGridPuzzle,
     OrderPuzzle,
     Puzzle,
     ScrabblePuzzle,
+    SudokuPuzzle,
     TextPuzzle,
+    WordLadderV2Puzzle,
+    WordSquarePuzzle,
     WordWheelPuzzle,
     WordsearchPuzzle,
 } from '../../api/schemas';
@@ -20,19 +27,26 @@ import { useTheme } from '../../theme';
 import { Button } from '../Button';
 import { PuzzleCompletionStats } from '../PuzzleCompletionStats';
 import { formatCompletionStats } from '../../lib/puzzleAnswer';
+import { CanvasPuzzleView } from './CanvasPuzzle';
 import { ChessPuzzleView } from './ChessPuzzle';
 import { ChoicePuzzleView } from './ChoicePuzzle';
 import { ClueRevealPuzzleView } from './ClueRevealPuzzle';
+import { CodewordPuzzleView } from './CodewordPuzzle';
 import { ConnectionsPuzzleView } from './ConnectionsPuzzle';
 import { CountdownPuzzleView } from './CountdownPuzzle';
+import { CrosswordPuzzleView } from './CrosswordPuzzle';
 import { ImageWordPuzzleView } from './ImageWordPuzzle';
 import { LadderPuzzleView } from './LadderPuzzle';
 import { MatchPuzzleView } from './MatchPuzzle';
+import { NumberSquarePuzzleView } from './NumberSquarePuzzle';
 import { NumGridPuzzleView } from './NumGridPuzzle';
 import { OrderPuzzleView } from './OrderPuzzle';
 import { TextAnswerPuzzle } from './TextAnswerPuzzle';
 import { ScrabblePuzzleView } from './ScrabblePuzzle';
+import { SudokuPuzzleView } from './SudokuPuzzle';
 import { UnsupportedPuzzle } from './UnsupportedPuzzle';
+import { WordLadderV2PuzzleView } from './WordLadderV2Puzzle';
+import { WordSquarePuzzleView } from './WordSquarePuzzle';
 import { WordWheelPuzzleView } from './WordWheelPuzzle';
 import { WordsearchPuzzleView } from './WordsearchPuzzle';
 
@@ -77,6 +91,9 @@ export function PuzzleRenderer({ puzzle, ...rest }: Props) {
         case 'ladder':
             content = <LadderPuzzleView puzzle={puzzle as LadderPuzzle} {...rest} />;
             break;
+        case 'word-ladder-v2':
+            content = <WordLadderV2PuzzleView puzzle={puzzle as WordLadderV2Puzzle} {...rest} />;
+            break;
         case 'choice':
             content = <ChoicePuzzleView puzzle={puzzle as ChoicePuzzle} {...rest} />;
             break;
@@ -112,6 +129,24 @@ export function PuzzleRenderer({ puzzle, ...rest }: Props) {
             break;
         case 'chess':
             content = <ChessPuzzleView puzzle={puzzle as ChessPuzzle} {...rest} />;
+            break;
+        case 'crossword':
+            content = <CrosswordPuzzleView puzzle={puzzle as CrosswordPuzzle} {...rest} />;
+            break;
+        case 'sudoku':
+            content = <SudokuPuzzleView puzzle={puzzle as SudokuPuzzle} {...rest} />;
+            break;
+        case 'codeword':
+            content = <CodewordPuzzleView puzzle={puzzle as CodewordPuzzle} {...rest} />;
+            break;
+        case 'word-square':
+            content = <WordSquarePuzzleView puzzle={puzzle as WordSquarePuzzle} {...rest} />;
+            break;
+        case 'number-square':
+            content = <NumberSquarePuzzleView puzzle={puzzle as NumberSquarePuzzle} {...rest} />;
+            break;
+        case 'canvas':
+            content = <CanvasPuzzleView puzzle={puzzle as CanvasPuzzle} {...rest} />;
             break;
         default:
             content = <UnsupportedPuzzle />;

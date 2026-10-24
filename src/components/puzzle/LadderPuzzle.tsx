@@ -3,13 +3,16 @@ import { Text, View } from 'react-native';
 import type { LadderPuzzle } from '../../api/schemas';
 import { useTheme } from '../../theme';
 import { Button } from '../Button';
-import { PuzzleHtml } from '../PuzzleHtml';
 import { TextInput } from '../TextInput';
 import type { PuzzleInteractionProps } from './PuzzleRenderer';
 
 type Props = { puzzle: LadderPuzzle } & PuzzleInteractionProps;
 
-const LADDER_STEP_COUNT = 4;
+const BLANK = '____';
+
+function parseSteps(question: string): string[] {
+    return question.split(',').map((step) => step.trim());
+}
 
 export function LadderPuzzleView({
     puzzle,
@@ -21,16 +24,19 @@ export function LadderPuzzleView({
     hintsRevealed,
     canHint,
 }: Props) {
-    const [steps, setSteps] = useState(() => Array.from({ length: LADDER_STEP_COUNT }, () => ''));
+    const steps = parseSteps(puzzle.question);
+    const blankIndexes = steps.flatMap((step, index) => (step === BLANK ? [index] : []));
+    const [guesses, setGuesses] = useState<Record<number, string>>({});
     const { colors, spacing, typography } = useTheme();
-    const isComplete = steps.every((step) => step.trim());
+    const isComplete = blankIndexes.every((index) => guesses[index]?.trim());
 
-    const updateStep = (index: number, value: string) => {
-        setSteps((prev) => prev.map((step, stepIndex) => (stepIndex === index ? value : step)));
+    const updateGuess = (index: number, value: string) => {
+        setGuesses((prev) => ({ ...prev, [index]: value }));
     };
 
     const handleSubmit = () => {
-        if (isComplete) onSubmit(steps.map((step) => step.trim()).join(','));
+        if (!isComplete) return;
+        onSubmit(blankIndexes.map((index) => guesses[index]!.trim()).join(', '));
     };
 
     return (
@@ -39,9 +45,41 @@ export function LadderPuzzleView({
                 <Text style={[typography.caption, { color: colors.textMuted }]}>
                     #{puzzle.puzzle_number} · {puzzle.puzzle_name}
                 </Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs }}>
+                    {steps.map((step, index) =>
+                        step === BLANK ? (
+                            <Text
+                                key={index}
+                                style={[
+                                    typography.body,
+                                    {
+                                        fontSize: 21,
+                                        lineHeight: 30,
+                                        minWidth: 60,
+                                        textAlign: 'center',
+                                        color: colors.primary,
+                                        borderBottomWidth: 2,
+                                        borderBottomColor: colors.primary,
+                                    },
+                                ]}
+                            >
+                                {guesses[index]?.trim() || BLANK}
+                            </Text>
+                        ) : (
+                            <Text
+                                key={index}
+                                style={[
+                                    typography.body,
+                                    { fontSize: 21, lineHeight: 30, color: colors.text },
+                                ]}
+                            >
+                                {step}
+                                {index < steps.length - 1 ? ',' : ''}
+                            </Text>
+                        )
+                    )}
+                </View>
             </View>
-
-            <PuzzleHtml html={puzzle.question} />
 
             {hintsRevealed.length > 0 && (
                 <View
@@ -61,16 +99,18 @@ export function LadderPuzzleView({
             )}
 
             <View style={{ gap: spacing.sm }}>
-                {steps.map((step, index) => (
+                {blankIndexes.map((stepIndex, blankNumber) => (
                     <TextInput
-                        key={index}
-                        label={`Step ${index + 1}`}
-                        value={step}
-                        onChangeText={(value) => updateStep(index, value)}
+                        key={stepIndex}
+                        label={`Blank ${blankNumber + 1}`}
+                        value={guesses[stepIndex] ?? ''}
+                        onChangeText={(value) => updateGuess(stepIndex, value)}
                         editable={!isSubmitting}
                         autoCorrect={false}
-                        returnKeyType="done"
-                        onSubmitEditing={handleSubmit}
+                        returnKeyType={blankNumber === blankIndexes.length - 1 ? 'done' : 'next'}
+                        onSubmitEditing={
+                            blankNumber === blankIndexes.length - 1 ? handleSubmit : undefined
+                        }
                     />
                 ))}
 

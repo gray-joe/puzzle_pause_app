@@ -17,7 +17,8 @@ import {
     getGuestPuzzleResultAsync,
     setGuestPuzzleResult,
 } from '../lib/guestPuzzleState';
-import { formatCompletionStats, formatPuzzleAnswer } from '../lib/puzzleAnswer';
+import { formatCompletionStats } from '../lib/puzzleAnswer';
+import { PuzzleAnswer } from '../components/puzzle/PuzzleAnswer';
 import { buildShareText, shareResult } from '../lib/shareResult';
 import { useTheme } from '../theme';
 
@@ -374,9 +375,11 @@ function ResultView({ puzzle, result }: ResultViewProps) {
             {result.answer != null && (
                 <View style={{ gap: spacing.xs }}>
                     <Text style={[typography.caption, { color: colors.textMuted }]}>Answer</Text>
-                    <Text style={[typography.body, { color: colors.text }]}>
-                        {formatPuzzleAnswer(puzzle, result.answer, result.question)}
-                    </Text>
+                    <PuzzleAnswer
+                        puzzle={puzzle}
+                        answer={result.answer}
+                        answerQuestion={result.question}
+                    />
                 </View>
             )}
 
