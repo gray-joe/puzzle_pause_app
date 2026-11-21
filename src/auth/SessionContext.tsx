@@ -52,8 +52,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
                 const user = await me(token);
                 setSession({ token, user });
             } catch (err) {
-                if (err instanceof ApiError && err.status !== 401) return;
-                await SecureStore.deleteItemAsync(JWT_KEY);
+                if (err instanceof ApiError && err.status === 401) {
+                    await SecureStore.deleteItemAsync(JWT_KEY);
+                }
             } finally {
                 setIsLoading(false);
             }

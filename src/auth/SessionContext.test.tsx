@@ -135,6 +135,22 @@ describe('SessionProvider', () => {
         expect(allText(renderer)).toContain('Ready: none');
     });
 
+    it.each([new TypeError('Network request failed'), new SyntaxError('Invalid response')])(
+        'keeps the saved token after a transient startup failure: %s',
+        async (error) => {
+            mocks.getItemAsync.mockResolvedValueOnce('stored-token');
+            mocks.me.mockRejectedValueOnce(error);
+            const view = render(
+                <SessionProvider>
+                    <Consumer />
+                </SessionProvider>
+            );
+            await flushEffects();
+            expect(mocks.deleteItemAsync).not.toHaveBeenCalled();
+            expect(allText(view)).toContain('Ready: none');
+        }
+    );
+
     it('stores tokens and clears cached data on sign in', async () => {
         const renderer = render(
             <SessionProvider>
