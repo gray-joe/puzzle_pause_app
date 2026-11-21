@@ -22,10 +22,8 @@ type GuestPuzzleState = {
 };
 
 let memoryState: GuestPuzzleState = { puzzles: {} };
-
-function hasRecords(state: GuestPuzzleState): boolean {
-    return Object.keys(state.puzzles).length > 0;
-}
+let deviceLoad: Promise<void> | null = null;
+let pendingWrite = Promise.resolve();
 
 function getStorage(): LocalStorageLike | null {
     const storage = (globalThis as { localStorage?: LocalStorageLike }).localStorage;
@@ -76,15 +74,14 @@ async function readStateAsync(): Promise<GuestPuzzleState> {
         return browserState;
     }
 
-    try {
-        const deviceState = parseState(await SecureStore.getItemAsync(STORAGE_KEY));
-        if (hasRecords(deviceState) || !hasRecords(memoryState)) {
-            memoryState = deviceState;
-        }
-    } catch {
-        return memoryState;
-    }
-
+    deviceLoad ??= SecureStore.getItemAsync(STORAGE_KEY)
+        .then((raw) => {
+            const deviceState = parseState(raw);
+            // Completions made while loading are newer than the saved snapshot.
+            memoryState = { puzzles: { ...deviceState.puzzles, ...memoryState.puzzles } };
+        })
+        .catch(() => {});
+    await deviceLoad;
     return memoryState;
 }
 
@@ -102,7 +99,15 @@ function writeBrowserState(state: GuestPuzzleState): void {
 function writeState(state: GuestPuzzleState): void {
     memoryState = state;
     writeBrowserState(state);
-    SecureStore.setItemAsync(STORAGE_KEY, JSON.stringify(state)).catch(() => {});
+    if (!getStorage()) {
+        pendingWrite = pendingWrite
+            .catch(() => {})
+            .then(async () => {
+                await readStateAsync();
+                await SecureStore.setItemAsync(STORAGE_KEY, JSON.stringify(memoryState));
+            })
+            .catch(() => {});
+    }
 }
 
 export function getGuestPuzzleResult(puzzleId: number): AttemptResponse | null {
@@ -165,4 +170,6 @@ export async function getGuestCompletedPuzzleIds(): Promise<Set<number>> {
 
 export function clearGuestPuzzleStateForTest(): void {
     memoryState = { puzzles: {} };
+    deviceLoad = null;
+    pendingWrite = Promise.resolve();
 }

@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import * as SecureStore from 'expo-secure-store';
 import type { AttemptResponse, Puzzle } from '../api/schemas';
 import {
     getGuestCompletedDatesAsync,
@@ -67,6 +68,33 @@ describe('guestPuzzleState', () => {
             '2026-05-07',
         ]);
         expect(await getGuestCompletedPuzzleIds()).toEqual(new Set([11]));
+    });
+
+    it('merges native history before writing completions made during a delayed read', async () => {
+        delete (globalThis as { localStorage?: unknown }).localStorage;
+        let finishRead!: (value: string) => void;
+        vi.mocked(SecureStore.getItemAsync).mockImplementationOnce(
+            () =>
+                new Promise((resolve) => {
+                    finishRead = resolve;
+                })
+        );
+        vi.mocked(SecureStore.setItemAsync).mockClear();
+        const loading = getGuestPuzzleResultAsync(10);
+        setGuestPuzzleResult(puzzle, solvedResult);
+        setGuestPuzzleResult({ ...puzzle, id: 12 }, solvedResult);
+        expect(SecureStore.setItemAsync).not.toHaveBeenCalled();
+        finishRead(
+            JSON.stringify({
+                puzzles: { '10': { ...puzzle, id: 10, completed: true, result: solvedResult } },
+            })
+        );
+        await loading;
+        expect(await getGuestCompletedPuzzleIds()).toEqual(new Set([10, 11, 12]));
+        await vi.waitFor(() => expect(SecureStore.setItemAsync).toHaveBeenCalledTimes(2));
+        const saved = JSON.parse(vi.mocked(SecureStore.setItemAsync).mock.calls.at(-1)![1]);
+        expect(Object.keys(saved.puzzles)).toEqual(['10', '11', '12']);
+        expect(SecureStore.getItemAsync).toHaveBeenCalledTimes(1);
     });
 
     it('does not persist incorrect attempts', () => {
