@@ -328,6 +328,7 @@ function ArchiveResultView({ puzzle, result }: ArchiveResultViewProps) {
     const [didCopy, setDidCopy] = useState(false);
     const [isLoadingRandom, setIsLoadingRandom] = useState(false);
     const [noUnsolvedLeft, setNoUnsolvedLeft] = useState(false);
+    const [randomError, setRandomError] = useState('');
     const token = session?.token ?? null;
     const completionStats = formatCompletionStats(puzzle.completion_stats);
 
@@ -346,6 +347,7 @@ function ArchiveResultView({ puzzle, result }: ArchiveResultViewProps) {
         if (isLoadingRandom) return;
         setIsLoadingRandom(true);
         setNoUnsolvedLeft(false);
+        setRandomError('');
         try {
             const unsolved = await archiveApi.list(token, { status: 'unsolved' });
             const candidates = unsolved.filter((p) => p.id !== puzzle.id);
@@ -355,6 +357,10 @@ function ArchiveResultView({ puzzle, result }: ArchiveResultViewProps) {
             }
             const pick = candidates[Math.floor(Math.random() * candidates.length)];
             router.push(`/archive/${pick.id}` as never);
+        } catch {
+            setRandomError(
+                'Could not load another puzzle. Check your connection and tap Another? to retry.'
+            );
         } finally {
             setIsLoadingRandom(false);
         }
@@ -414,6 +420,11 @@ function ArchiveResultView({ puzzle, result }: ArchiveResultViewProps) {
                 </Text>
             </Pressable>
 
+            {randomError ? (
+                <Text accessibilityRole="alert" style={[typography.body, { color: colors.error }]}>
+                    {randomError}
+                </Text>
+            ) : null}
             {noUnsolvedLeft && (
                 <Text
                     style={[typography.caption, { color: colors.textMuted, textAlign: 'center' }]}

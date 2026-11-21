@@ -1133,6 +1133,24 @@ describe('archive routes', () => {
         expect(routerMock.push).toHaveBeenCalledWith('/archive/2');
     });
 
+    it('shows an actionable error when Another? fails and supports retry', async () => {
+        localSearchParamsMock.mockReturnValue({ id: String(wordPuzzle.id) });
+        setQuery({
+            data: { ...wordPuzzle, attempt: { ...wordPuzzle.attempt, solved: true, score: 90 } },
+        });
+        mocks.archiveList
+            .mockRejectedValueOnce(new TypeError('offline'))
+            .mockResolvedValueOnce([{ ...wordPuzzle, id: 44 }]);
+        const { default: ArchiveDetailScreen } = await import('../app/(tabs)/archive/[id]');
+        const view = render(<ArchiveDetailScreen />);
+        await pressAsync(findPressableByText(view, 'Another?')!);
+        expect(allText(view)).toContain('Could not load another puzzle');
+        await pressAsync(findPressableByText(view, 'Another?')!);
+        expect(allText(view)).not.toContain('Could not load another puzzle');
+        expect(routerMock.push).toHaveBeenCalledWith('/archive/44');
+        act(() => view.unmount());
+    });
+
     it('renders archive detail puzzles and handles attempts and hints', async () => {
         localSearchParamsMock.mockReturnValue({ id: '11' });
         setQuery({ data: wordPuzzle });
