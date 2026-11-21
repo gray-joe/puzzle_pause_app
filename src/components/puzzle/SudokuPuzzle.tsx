@@ -63,7 +63,20 @@ export function SudokuPuzzleView({ puzzle, onSubmit, ...rest }: Props) {
             <GridKeyInput
                 ref={inputRef}
                 numeric
-                onChar={(char) => /^[1-9]$/.test(char) && setDigit(char)}
+                onText={(text) => {
+                    if (selected < 0 || isGiven(selected)) return;
+                    const nextDigits = [...digits];
+                    let cursor = selected;
+                    for (const char of text.replace(/[^1-9]/g, '')) {
+                        nextDigits[cursor] = char;
+                        if (text.length === 1) break;
+                        const next = givens.findIndex((_, i) => i > cursor && !isGiven(i));
+                        if (next < 0) break;
+                        cursor = next;
+                    }
+                    setDigits(nextDigits);
+                    setSelected(cursor);
+                }}
                 onBackspace={() => setDigit('')}
                 editable={!rest.isSubmitting}
             />

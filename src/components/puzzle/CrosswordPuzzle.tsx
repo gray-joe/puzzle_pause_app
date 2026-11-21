@@ -45,11 +45,17 @@ export function CrosswordPuzzleView({ puzzle, onSubmit, ...rest }: Props) {
     const setLetter = (index: number, letter: string) =>
         setLetters((prev) => prev.map((value, i) => (i === index ? letter : value)));
 
-    const onChar = (char: string) => {
-        if (!/^[A-Z]$/.test(char)) return;
-        setLetter(selected, char);
-        const next = word[word.indexOf(selected) + 1];
-        if (next != null) setSelected(next);
+    const onText = (text: string) => {
+        const nextLetters = [...letters];
+        let cursor = selected;
+        for (const char of text.replace(/[^A-Z]/g, '')) {
+            nextLetters[cursor] = char;
+            const next = word[word.indexOf(cursor) + 1];
+            if (next == null) break;
+            cursor = next;
+        }
+        setLetters(nextLetters);
+        setSelected(cursor);
     };
 
     const onBackspace = () => {
@@ -106,7 +112,7 @@ export function CrosswordPuzzleView({ puzzle, onSubmit, ...rest }: Props) {
             />
             <GridKeyInput
                 ref={inputRef}
-                onChar={onChar}
+                onText={onText}
                 onBackspace={onBackspace}
                 editable={!rest.isSubmitting}
             />

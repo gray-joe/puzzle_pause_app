@@ -157,23 +157,23 @@ export function GridBoard({
 
 /**
  * Invisible input that drives a grid from the native keyboard. It stays empty: typed characters
- * arrive via onChar, and Backspace (which fires even on an empty field) via onBackspace.
+ * arrive together via onText, and Backspace (which fires even on an empty field) via onBackspace.
  */
 export const GridKeyInput = forwardRef<
     RNTextInput,
     {
-        onChar: (char: string) => void;
+        onText: (text: string) => void;
         onBackspace: () => void;
         numeric?: boolean;
         editable?: boolean;
     }
->(function GridKeyInput({ onChar, onBackspace, numeric, editable }, ref) {
+>(function GridKeyInput({ onText, onBackspace, numeric, editable }, ref) {
     return (
         <RNTextInput
             ref={ref}
             accessibilityLabel="Puzzle grid keyboard"
             value=""
-            onChangeText={(text) => [...text].forEach((char) => onChar(char.toUpperCase()))}
+            onChangeText={(text) => onText(text.toUpperCase())}
             onKeyPress={(event) => {
                 if (event.nativeEvent.key === 'Backspace') onBackspace();
             }}

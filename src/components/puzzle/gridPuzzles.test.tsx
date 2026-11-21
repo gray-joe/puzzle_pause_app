@@ -187,6 +187,56 @@ describe.each(['crossword', 'codeword'])('%s large boards', (type) => {
     });
 });
 
+describe('multi-character grid input', () => {
+    it('pastes a whole crossword word in a single input event', () => {
+        const { renderer, cell } = renderPuzzle(
+            puzzle('crossword', {
+                prompt: '',
+                layout: ['...', '.#.', '...'],
+                clues: { across: { '1': 'Pet' }, down: {} },
+            })
+        );
+        changeText(findByHost(renderer, 'TextInput'), 'cat');
+        expect([1, 2, 3].map((col) => textContent(cell(1, col)).replace(/\d/g, ''))).toEqual([
+            'C',
+            'A',
+            'T',
+        ]);
+    });
+
+    it.each([
+        [
+            'sudoku',
+            { prompt: '', grid: '0' + '1'.repeat(79) + '0' },
+            '59',
+            '5' + '1'.repeat(79) + '9',
+        ],
+        [
+            'codeword',
+            {
+                prompt: '',
+                cells: [
+                    [1, 2, 3],
+                    [2, 0, 1],
+                    [3, 1, 2],
+                ],
+                givens: { '1': 'A' },
+            },
+            'bc',
+            'ABCB#ACAB',
+        ],
+        ['word-square', { prompt: '', size: 3, clues: ['', '', ''] }, 'catren', 'CATARETEN'],
+    ])(
+        'pastes %s entries without losing characters or givens',
+        (kind, question, input, expected) => {
+            const { renderer, submit, onSubmit } = renderPuzzle(puzzle(kind as string, question));
+            changeText(findByHost(renderer, 'TextInput'), input as string);
+            press(submit());
+            expect(onSubmit).toHaveBeenCalledWith(expected);
+        }
+    );
+});
+
 describe('SudokuPuzzleView', () => {
     const solution =
         '534678912672195348198342567859761423426853791713924856961537284287419635345286179';

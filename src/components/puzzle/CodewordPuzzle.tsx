@@ -52,20 +52,27 @@ export function CodewordPuzzleView({ puzzle, onSubmit, ...rest }: Props) {
         inputRef.current?.focus();
     };
 
-    const onChar = (char: string) => {
-        if (!/^[A-Z]$/.test(char) || !selectedCode || isGiven(selectedCode)) return;
-        const owner = Object.entries(letters).find(([, l]) => l === char)?.[0];
-        if (owner && Number(owner) !== selectedCode) {
-            setMessage(`${char} is already used for ${owner}`);
-            return;
+    const onText = (text: string) => {
+        const nextLetters = { ...letters };
+        let cursor = selected;
+        for (const char of text.replace(/[^A-Z]/g, '')) {
+            const code = codes[cursor];
+            if (!code || isGiven(code)) break;
+            const owner = Object.entries(nextLetters).find(([, letter]) => letter === char)?.[0];
+            if (owner && Number(owner) !== code) {
+                setMessage(`${char} is already used for ${owner}`);
+                continue;
+            }
+            setMessage('');
+            nextLetters[code] = char;
+            const next = codes.findIndex(
+                (c, i) => i > cursor && c > 0 && !isGiven(c) && !nextLetters[c]
+            );
+            if (next < 0) break;
+            cursor = next;
         }
-        setMessage('');
-        setLetters((prev) => ({ ...prev, [selectedCode]: char }));
-        // Jump to the next cell whose code still needs a letter.
-        const next = codes.findIndex(
-            (c, i) => i > selected && c > 0 && c !== selectedCode && !isGiven(c) && !letters[c]
-        );
-        if (next >= 0) setSelected(next);
+        setLetters(nextLetters);
+        setSelected(cursor);
     };
 
     const onBackspace = () => {
@@ -104,7 +111,7 @@ export function CodewordPuzzleView({ puzzle, onSubmit, ...rest }: Props) {
             />
             <GridKeyInput
                 ref={inputRef}
-                onChar={onChar}
+                onText={onText}
                 onBackspace={onBackspace}
                 editable={!rest.isSubmitting}
             />

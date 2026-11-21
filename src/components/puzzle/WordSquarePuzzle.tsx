@@ -29,12 +29,21 @@ export function WordSquarePuzzleView({ puzzle, onSubmit, ...rest }: Props) {
         inputRef.current?.focus();
     };
 
-    const onChar = (char: string) => {
-        if (!/^[A-Z]$/.test(char)) return;
-        setLetter(char);
-        // Advance through the upper triangle only; the rest is filled by mirroring.
-        const next = letters.findIndex((_, i) => i > selected && i % size >= Math.floor(i / size));
-        if (next >= 0) setSelected(next);
+    const onText = (text: string) => {
+        const nextLetters = [...letters];
+        let cursor = selected;
+        for (const char of text.replace(/[^A-Z]/g, '')) {
+            nextLetters[cursor] = char;
+            nextLetters[(cursor % size) * size + Math.floor(cursor / size)] = char;
+            // Walk the upper triangle; the lower triangle is mirrored.
+            const next = nextLetters.findIndex(
+                (_, i) => i > cursor && i % size >= Math.floor(i / size)
+            );
+            if (next < 0) break;
+            cursor = next;
+        }
+        setLetters(nextLetters);
+        setSelected(cursor);
     };
 
     const canSubmit = letters.every(Boolean);
@@ -65,7 +74,7 @@ export function WordSquarePuzzleView({ puzzle, onSubmit, ...rest }: Props) {
             />
             <GridKeyInput
                 ref={inputRef}
-                onChar={onChar}
+                onText={onText}
                 onBackspace={() => setLetter('')}
                 editable={!rest.isSubmitting}
             />
