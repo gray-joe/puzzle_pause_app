@@ -2,8 +2,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as SecureStore from 'expo-secure-store';
 import type { AttemptResponse, Puzzle } from '../api/schemas';
 import {
-    getGuestCompletedDatesAsync,
-    getGuestCompletedDates,
     getGuestCompletedPuzzleIds,
     getGuestPuzzleResultAsync,
     getGuestPuzzleResult,
@@ -46,6 +44,7 @@ const solvedResult: AttemptResponse = {
 
 describe('guestPuzzleState', () => {
     beforeEach(() => {
+        vi.clearAllMocks();
         clearGuestPuzzleStateForTest();
         Object.defineProperty(globalThis, 'localStorage', {
             value: new MemoryStorage(),
@@ -60,14 +59,16 @@ describe('guestPuzzleState', () => {
         expect(getGuestPuzzleResult(11)).toEqual(solvedResult);
     });
 
-    it('loads solved puzzle results from async device storage', async () => {
-        setGuestPuzzleResult(puzzle, solvedResult);
-
+    it('loads solved puzzle results and archive ids from native storage', async () => {
+        delete (globalThis as { localStorage?: unknown }).localStorage;
+        vi.mocked(SecureStore.getItemAsync).mockResolvedValueOnce(
+            JSON.stringify({
+                puzzles: { [puzzle.id]: { ...puzzle, completed: true, result: solvedResult } },
+            })
+        );
         expect(await getGuestPuzzleResultAsync(11)).toEqual(solvedResult);
-        expect(await getGuestCompletedDatesAsync('2026-05-01', '2026-05-31')).toEqual([
-            '2026-05-07',
-        ]);
         expect(await getGuestCompletedPuzzleIds()).toEqual(new Set([11]));
+        expect(SecureStore.getItemAsync).toHaveBeenCalledTimes(1);
     });
 
     it('merges native history before writing completions made during a delayed read', async () => {
@@ -137,17 +138,16 @@ describe('guestPuzzleState', () => {
 
         expect(getGuestPuzzleResult(11)).toBeNull();
         expect(isGuestPuzzleCompleted(11)).toBe(false);
-        expect(getGuestCompletedDates('2026-05-01', '2026-05-31')).toEqual([]);
         expect(await getGuestCompletedPuzzleIds()).toEqual(new Set());
     });
 
-    it('returns completed dates inside the requested range', () => {
+    it('returns completed archive ids across dates', async () => {
         setGuestPuzzleResult(puzzle, solvedResult);
         setGuestPuzzleResult(
             { ...puzzle, id: 12, puzzle_date: '2026-06-01' } as Puzzle,
             solvedResult
         );
 
-        expect(getGuestCompletedDates('2026-05-01', '2026-05-31')).toEqual(['2026-05-07']);
+        expect(await getGuestCompletedPuzzleIds()).toEqual(new Set([11, 12]));
     });
 });

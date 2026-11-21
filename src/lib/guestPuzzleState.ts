@@ -157,22 +157,6 @@ export function setGuestPuzzleResult(puzzle: Puzzle, result: AttemptResponse): v
     writeState(state);
 }
 
-export function getGuestCompletedDates(start: string, end: string): string[] {
-    return Object.values(readState().puzzles)
-        .filter((record) => record.result.correct || record.result.solved)
-        .map((record) => record.puzzle_date)
-        .filter((date) => date >= start && date <= end)
-        .sort();
-}
-
-export async function getGuestCompletedDatesAsync(start: string, end: string): Promise<string[]> {
-    return Object.values((await readStateAsync()).puzzles)
-        .filter((record) => record.result.correct || record.result.solved)
-        .map((record) => record.puzzle_date)
-        .filter((date) => date >= start && date <= end)
-        .sort();
-}
-
 export async function getGuestCompletedPuzzleIds(): Promise<Set<number>> {
     return new Set(
         Object.values((await readStateAsync()).puzzles)
