@@ -34,6 +34,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
     const signOut = useCallback(async () => {
         const token = tokenRef.current;
+        tokenRef.current = null;
         setSession(null);
         queryClient.clear();
         await SecureStore.deleteItemAsync(JWT_KEY);
@@ -41,7 +42,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     }, []);
 
     useEffect(() => {
-        registerUnauthorizedHandler(signOut);
+        registerUnauthorizedHandler((failedToken) => {
+            if (failedToken === tokenRef.current) void signOut();
+        });
+        return () => registerUnauthorizedHandler(null);
     }, [signOut]);
 
     useEffect(() => {
@@ -50,6 +54,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
                 const token = await SecureStore.getItemAsync(JWT_KEY);
                 if (!token) return;
                 const user = await me(token);
+                tokenRef.current = token;
                 setSession({ token, user });
             } catch (err) {
                 if (err instanceof ApiError && err.status === 401) {
@@ -65,6 +70,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     const signIn = useCallback(async (token: string, user: User) => {
         await SecureStore.setItemAsync(JWT_KEY, token);
         queryClient.clear();
+        tokenRef.current = token;
         setSession({ token, user });
     }, []);
 

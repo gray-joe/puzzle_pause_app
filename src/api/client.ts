@@ -24,9 +24,9 @@ type RequestOptions = {
     signal?: AbortSignal;
 };
 
-let onUnauthorizedHandler: (() => void) | null = null;
+let onUnauthorizedHandler: ((token: string) => void) | null = null;
 
-export function registerUnauthorizedHandler(fn: () => void): void {
+export function registerUnauthorizedHandler(fn: ((token: string) => void) | null): void {
     onUnauthorizedHandler = fn;
 }
 
@@ -64,7 +64,7 @@ export async function apiRequest<T>(
 ): Promise<T> {
     const { method = 'GET', body, token, signal } = opts;
     if (token && isExpiredJwt(token)) {
-        onUnauthorizedHandler?.();
+        onUnauthorizedHandler?.(token);
         throw new ApiError(401, 'Your session has expired. Please sign in again.', null);
     }
 
@@ -98,7 +98,7 @@ export async function apiRequest<T>(
             detail ?? `Request failed with status ${res.status}`,
             parsed
         );
-        if (res.status === 401) onUnauthorizedHandler?.();
+        if (res.status === 401 && token) onUnauthorizedHandler?.(token);
         throw error;
     }
 

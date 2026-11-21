@@ -2,7 +2,8 @@ import * as Sentry from '@sentry/react-native';
 import React from 'react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { act } from 'react-test-renderer';
-import { ApiError } from '../api/client';
+import { ApiError, apiRequest } from '../api/client';
+import { z } from 'zod';
 import type { User } from '../api/schemas';
 import { allText, findPressableByText, pressAsync, render } from '../test/render';
 import { SessionProvider } from './SessionContext';
@@ -184,6 +185,36 @@ describe('SessionProvider', () => {
         expect(mocks.logout).toHaveBeenCalledWith('stored-token');
         expect(Sentry.setUser).toHaveBeenLastCalledWith(null);
         expect(allText(renderer)).toContain('Ready: none');
+    });
+
+    it('ignores old-session 401s after signing into a new session', async () => {
+        mocks.getItemAsync.mockResolvedValueOnce('old-token');
+        mocks.me.mockResolvedValueOnce(user);
+        const view = render(
+            <SessionProvider>
+                <Consumer />
+            </SessionProvider>
+        );
+        await flushEffects();
+        await pressAsync(findPressableByText(view, 'Sign in')!);
+        vi.stubGlobal(
+            'fetch',
+            vi.fn().mockResolvedValue({ ok: false, status: 401, text: async () => '{}' })
+        );
+        try {
+            await act(async () => {
+                await apiRequest('/account', z.unknown(), { token: 'old-token' }).catch(() => {});
+            });
+            expect(allText(view)).toContain('Ready: user@example.com');
+            expect(mocks.deleteItemAsync).not.toHaveBeenCalled();
+            await act(async () => {
+                await apiRequest('/account', z.unknown(), { token: 'new-token' }).catch(() => {});
+            });
+            expect(allText(view)).toContain('Ready: none');
+        } finally {
+            vi.unstubAllGlobals();
+            act(() => view.unmount());
+        }
     });
 
     it('does not call logout when signing out without a token', async () => {

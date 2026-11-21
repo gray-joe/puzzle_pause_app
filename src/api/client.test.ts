@@ -231,7 +231,19 @@ describe('apiRequest', () => {
         await expect(apiRequest('/secure', z.unknown(), { token: 'bad' })).rejects.toBeInstanceOf(
             Error
         );
-        expect(onUnauthorized).toHaveBeenCalledTimes(1);
+        expect(onUnauthorized).toHaveBeenCalledExactlyOnceWith('bad');
+    });
+
+    it('does not sign out a session for a public request’s 401', async () => {
+        vi.stubGlobal(
+            'fetch',
+            vi.fn().mockResolvedValue(makeResponse(401, { detail: 'Unauthorized' }))
+        );
+        const { apiRequest, registerUnauthorizedHandler } = await import('./client');
+        const handler = vi.fn();
+        registerUnauthorizedHandler(handler);
+        await expect(apiRequest('/public', z.unknown())).rejects.toMatchObject({ status: 401 });
+        expect(handler).not.toHaveBeenCalled();
     });
 
     it('rejects expired JWTs before optional-auth requests can fall back to a guest', async () => {
