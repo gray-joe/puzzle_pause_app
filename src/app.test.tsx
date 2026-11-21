@@ -1060,6 +1060,29 @@ describe('today puzzle route', () => {
 });
 
 describe('archive routes', () => {
+    it('lets guests reach matching puzzles beyond an empty filtered page', async () => {
+        setSession(null);
+        const recent = { ...wordPuzzle, id: 21, solved: false };
+        setInfiniteQuery({ data: { pages: [[recent]] }, hasNextPage: true });
+        const { default: ArchiveListScreen } = await import('../app/(tabs)/archive/index');
+        const view = render(<ArchiveListScreen />);
+        press(findPressableByText(view, 'solved')!);
+        expect(allText(view)).not.toContain('No solved puzzles.');
+        press(findPressableByText(view, 'Load more puzzles')!);
+        expect(mocks.fetchNextPage).toHaveBeenCalledOnce();
+        setInfiniteQuery({
+            data: {
+                pages: [
+                    [recent],
+                    [{ ...recent, id: 22, solved: true, puzzle_name: 'Older solved puzzle' }],
+                ],
+            },
+            hasNextPage: false,
+        });
+        update(view, <ArchiveListScreen />);
+        expect(allText(view)).toContain('Older solved puzzle');
+        act(() => view.unmount());
+    });
     it('requests filtered archive pages and opens selected puzzles', async () => {
         setInfiniteQuery({
             data: {

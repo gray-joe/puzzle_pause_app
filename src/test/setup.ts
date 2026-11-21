@@ -38,7 +38,8 @@ const FlatList = ({ data = [], renderItem, keyExtractor, ...props }: Record<stri
                 { key: keyExtractor ? keyExtractor(item, index) : index },
                 renderItem?.({ item, index })
             )
-        )
+        ),
+        data.length === 0 ? props.ListEmptyComponent : null
     );
 
 vi.mock('react-native', () => ({

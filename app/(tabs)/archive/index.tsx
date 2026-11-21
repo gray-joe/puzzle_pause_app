@@ -6,6 +6,7 @@ import * as archiveApi from '../../../src/api/archive';
 import type { ArchiveListItem } from '../../../src/api/schemas';
 import { useSession } from '../../../src/auth/useSession';
 import { QueryStateView } from '../../../src/components/QueryStateView';
+import { Button } from '../../../src/components/Button';
 import { Screen } from '../../../src/components/Screen';
 import {
     getGuestCompletedPuzzleIds,
@@ -116,7 +117,7 @@ export default function ArchiveListScreen() {
                 <QueryStateView
                     isLoading={isLoading}
                     error={error as Error | null}
-                    isEmpty={items.length === 0}
+                    isEmpty={items.length === 0 && !hasNextPage}
                     emptyMessage={
                         filter === 'all' ? 'No past puzzles yet.' : `No ${filter} puzzles.`
                     }
@@ -132,6 +133,15 @@ export default function ArchiveListScreen() {
                                 onPress={() => router.push(`/archive/${item.id}` as never)}
                             />
                         )}
+                        ListEmptyComponent={
+                            hasNextPage ? (
+                                <Button
+                                    title="Load more puzzles"
+                                    onPress={handleEndReached}
+                                    loading={isFetchingNextPage}
+                                />
+                            ) : null
+                        }
                         onEndReached={handleEndReached}
                         onEndReachedThreshold={0.5}
                         ListFooterComponent={
