@@ -1514,6 +1514,35 @@ describe('league routes', () => {
     });
 });
 
+describe.each(['today', 'archive'] as const)('%s refresh recovery', (scope) => {
+    it('keeps entered answers mounted through failed refreshes and retries', async () => {
+        let error: Error | null = null;
+        localSearchParamsMock.mockReturnValue({ id: String(wordPuzzle.id) });
+        mocks.useQuery.mockImplementation((options) => ({
+            data: ['today', 'detail'].includes(options.queryKey[1]) ? wordPuzzle : undefined,
+            isLoading: false,
+            error,
+            refetch: mocks.refetch,
+        }));
+        const Component =
+            scope === 'today'
+                ? (await import('./screens/TodayPuzzleScreen')).TodayPuzzleScreen
+                : (await import('../app/(tabs)/archive/[id]')).default;
+        const view = render(<Component />);
+        changeText(findByHost(view, 'TextInput'), 'KEEP MY ANSWER');
+        error = new Error('Refresh unavailable');
+        update(view, <Component />);
+        expect(allText(view)).toContain('Refresh unavailable');
+        expect(findByHost(view, 'TextInput').props.value).toBe('KEEP MY ANSWER');
+        press(findPressableByText(view, 'Retry refresh')!);
+        expect(mocks.refetch).toHaveBeenCalled();
+        error = null;
+        update(view, <Component />);
+        expect(findByHost(view, 'TextInput').props.value).toBe('KEEP MY ANSWER');
+        act(() => view.unmount());
+    });
+});
+
 describe.each(['today', 'archive'] as const)('%s guest result ownership', (scope) => {
     it('ignores guest storage results after the owner changes', async () => {
         setSession(null);

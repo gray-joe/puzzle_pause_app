@@ -7,6 +7,7 @@ type Props = {
     isLoading: boolean;
     error?: Error | null;
     isEmpty?: boolean;
+    hasData?: boolean;
     emptyMessage?: string;
     onRetry?: () => void;
     children: ReactNode;
@@ -16,6 +17,7 @@ export function QueryStateView({
     isLoading,
     error,
     isEmpty,
+    hasData = false,
     emptyMessage,
     onRetry,
     children,
@@ -30,7 +32,7 @@ export function QueryStateView({
         );
     }
 
-    if (error) {
+    if (error && !hasData) {
         return (
             <View
                 style={{
@@ -68,5 +70,23 @@ export function QueryStateView({
         );
     }
 
-    return <>{children}</>;
+    return (
+        <>
+            {error && (
+                <View style={{ gap: spacing.sm }}>
+                    <Text
+                        accessibilityRole="alert"
+                        style={[typography.body, { color: colors.error }]}
+                    >
+                        {error.message ||
+                            'Could not refresh. Your current puzzle is still available.'}
+                    </Text>
+                    {onRetry && (
+                        <Button title="Retry refresh" variant="secondary" onPress={onRetry} />
+                    )}
+                </View>
+            )}
+            {children}
+        </>
+    );
 }

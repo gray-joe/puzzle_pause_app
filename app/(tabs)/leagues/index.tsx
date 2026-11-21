@@ -62,6 +62,7 @@ export default function LeaguesListScreen() {
             <View style={{ flex: 1 }}>
                 <QueryStateView
                     isLoading={isLoading}
+                    hasData={!!data}
                     error={error as Error | null}
                     isEmpty={data?.length === 0}
                     emptyMessage={

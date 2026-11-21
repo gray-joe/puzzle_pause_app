@@ -125,6 +125,7 @@ export default function LeagueDetailScreen() {
             <Screen scrollable padded refreshing={refreshing} onRefresh={handleRefresh}>
                 <QueryStateView
                     isLoading={isLoading}
+                    hasData={!!data}
                     error={error as Error | null}
                     onRetry={refetch}
                 >

@@ -98,6 +98,7 @@ export default function TodayLandingScreen() {
         <Screen scrollable padded>
             <QueryStateView
                 isLoading={isLoading}
+                hasData={!!puzzle}
                 error={todayPuzzleError as Error | null}
                 onRetry={refetch}
             >

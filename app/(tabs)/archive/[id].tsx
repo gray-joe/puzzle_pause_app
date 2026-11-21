@@ -269,6 +269,7 @@ export default function ArchiveDetailScreen() {
             <Screen scrollable padded refreshing={refreshing} onRefresh={handleRefresh}>
                 <QueryStateView
                     isLoading={isLoading}
+                    hasData={!!puzzle}
                     error={error as Error | null}
                     onRetry={refetch}
                 >

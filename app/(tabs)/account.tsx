@@ -72,6 +72,7 @@ export default function AccountScreen() {
 
                 <QueryStateView
                     isLoading={isLoading}
+                    hasData={!!data}
                     error={error as Error | null}
                     onRetry={refetch}
                 >

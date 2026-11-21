@@ -116,6 +116,7 @@ export default function ArchiveListScreen() {
             <View style={{ flex: 1 }}>
                 <QueryStateView
                     isLoading={isLoading}
+                    hasData={!!data}
                     error={error as Error | null}
                     isEmpty={items.length === 0 && !hasNextPage}
                     emptyMessage={

@@ -315,6 +315,7 @@ export function TodayPuzzleScreen() {
             <Screen scrollable padded refreshing={refreshing} onRefresh={handleRefresh}>
                 <QueryStateView
                     isLoading={isPageLoading}
+                    hasData={!!puzzle}
                     error={error as Error | null}
                     onRetry={refetch}
                 >
