@@ -1,5 +1,6 @@
 import * as SecureStore from 'expo-secure-store';
-import type { AttemptResponse, Puzzle } from '../api/schemas';
+import { z } from 'zod';
+import { AttemptResponseSchema, type AttemptResponse, type Puzzle } from '../api/schemas';
 
 const STORAGE_KEY = 'pp_guest_puzzle_states_v1';
 
@@ -8,14 +9,15 @@ type LocalStorageLike = {
     setItem: (key: string, value: string) => void;
 };
 
-type GuestPuzzleRecord = {
-    id: number;
-    puzzle_date: string;
-    puzzle_name: string;
-    puzzle_number: number;
-    completed: true;
-    result: AttemptResponse;
-};
+const GuestPuzzleRecordSchema = z.object({
+    id: z.number().int().positive(),
+    puzzle_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    puzzle_name: z.string(),
+    puzzle_number: z.number(),
+    completed: z.literal(true),
+    result: AttemptResponseSchema.refine((result) => result.correct || result.solved),
+});
+type GuestPuzzleRecord = z.infer<typeof GuestPuzzleRecordSchema>;
 
 type GuestPuzzleState = {
     puzzles: Record<string, GuestPuzzleRecord>;
@@ -41,11 +43,22 @@ function parseState(raw: string | null): GuestPuzzleState {
     if (!raw) return { puzzles: {} };
 
     const parsed = JSON.parse(raw) as Partial<GuestPuzzleState>;
-    if (!parsed || typeof parsed !== 'object' || typeof parsed.puzzles !== 'object') {
+    if (
+        !parsed ||
+        typeof parsed !== 'object' ||
+        !parsed.puzzles ||
+        typeof parsed.puzzles !== 'object' ||
+        Array.isArray(parsed.puzzles)
+    ) {
         return { puzzles: {} };
     }
 
-    return { puzzles: parsed.puzzles ?? {} };
+    const puzzles: Record<string, GuestPuzzleRecord> = {};
+    for (const [key, value] of Object.entries(parsed.puzzles)) {
+        const result = GuestPuzzleRecordSchema.safeParse(value);
+        if (result.success && String(result.data.id) === key) puzzles[key] = result.data;
+    }
+    return { puzzles };
 }
 
 function readBrowserState(): GuestPuzzleState | null {

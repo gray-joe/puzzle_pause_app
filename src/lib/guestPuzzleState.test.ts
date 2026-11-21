@@ -97,6 +97,26 @@ describe('guestPuzzleState', () => {
         expect(SecureStore.getItemAsync).toHaveBeenCalledTimes(1);
     });
 
+    it.each([null, [], { bad: null, broken: { result: {} } }])(
+        'ignores malformed native records without losing valid history: %j',
+        async (invalid) => {
+            delete (globalThis as { localStorage?: unknown }).localStorage;
+            const valid = { ...puzzle, completed: true, result: solvedResult };
+            vi.mocked(SecureStore.getItemAsync).mockResolvedValueOnce(
+                JSON.stringify({
+                    puzzles:
+                        invalid && !Array.isArray(invalid)
+                            ? { ...invalid, [puzzle.id]: valid }
+                            : invalid,
+                })
+            );
+            const ids = await getGuestCompletedPuzzleIds();
+            expect(ids).toEqual(
+                invalid && !Array.isArray(invalid) ? new Set([puzzle.id]) : new Set()
+            );
+        }
+    );
+
     it('does not persist incorrect attempts', () => {
         setGuestPuzzleResult(puzzle, { ...solvedResult, correct: false, solved: false });
 
