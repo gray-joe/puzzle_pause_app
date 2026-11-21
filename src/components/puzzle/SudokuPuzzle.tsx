@@ -3,12 +3,22 @@ import { TextInput as RNTextInput } from 'react-native';
 import type { SudokuPuzzle } from '../../api/schemas';
 import { GridBoard, GridKeyInput, GridPuzzleFrame } from './grid';
 import type { PuzzleInteractionProps } from './PuzzleRenderer';
+import { useDraftState } from './PuzzleDraftProvider';
 
 type Props = { puzzle: SudokuPuzzle } & PuzzleInteractionProps;
 
 export function SudokuPuzzleView({ puzzle, onSubmit, ...rest }: Props) {
     const givens = puzzle.question.grid.split('');
-    const [digits, setDigits] = useState(() => givens.map((d) => (d === '0' ? '' : d)));
+    const [digits, setDigits] = useDraftState(
+        'digits',
+        () => givens.map((d) => (d === '0' ? '' : d)),
+        (value) =>
+            Array.isArray(value) &&
+            value.length === givens.length &&
+            value.every((d) => typeof d === 'string' && /^[1-9]?$/.test(d))
+                ? value.map((d: string, i: number) => (givens[i] === '0' ? d : givens[i]!))
+                : undefined
+    );
     const [selected, setSelected] = useState(() => givens.indexOf('0'));
     const inputRef = useRef<RNTextInput>(null);
     const isGiven = (index: number) => givens[index] !== '0';

@@ -39,11 +39,15 @@ export async function attempt(
     });
 }
 
-export async function hint(token: string | null, puzzleId: number): Promise<HintResponse> {
+export async function hint(
+    token: string | null,
+    puzzleId: number,
+    hintsRevealed = 0
+): Promise<HintResponse> {
     return apiRequest('/puzzle/hint', HintResponseSchema, {
         method: 'POST',
         token,
-        body: { puzzle_id: puzzleId },
+        body: { puzzle_id: puzzleId, ...(!token ? { hints_revealed: hintsRevealed } : {}) },
     });
 }
 

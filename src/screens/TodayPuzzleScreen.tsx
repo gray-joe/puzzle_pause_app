@@ -20,11 +20,13 @@ import {
 import { formatCompletionStats } from '../lib/puzzleAnswer';
 import { PuzzleAnswer } from '../components/puzzle/PuzzleAnswer';
 import { buildShareText, shareResult } from '../lib/shareResult';
+import { clearPuzzleDraft } from '../lib/puzzleDrafts';
 import { useTheme } from '../theme';
 
 export function TodayPuzzleScreen() {
     const { session } = useSession();
     const token = session?.token ?? null;
+    const draftOwner = session ? `user:${session.user.id}` : 'guest';
     const userKey = token ?? 'guest';
     const queryClient = useQueryClient();
     const { colors } = useTheme();
@@ -46,6 +48,7 @@ export function TodayPuzzleScreen() {
     const [sessionIncorrectGuesses, setSessionIncorrectGuesses] = useState<number | null>(null);
     const [sessionOpenedAt, setSessionOpenedAt] = useState<string | null>(null);
     const [submitError, setSubmitError] = useState('');
+    const [hintError, setHintError] = useState('');
     const [refreshing, setRefreshing] = useState(false);
     const giveUpPendingRef = useRef(false);
 
@@ -106,6 +109,12 @@ export function TodayPuzzleScreen() {
 
     const displayResult: AttemptResponse | null =
         localResult ?? initialGiveUpResult ?? serverResult ?? fallbackResult ?? guestResult;
+    useEffect(() => {
+        if (puzzle && (puzzle.solved || puzzle.attempt?.solved || puzzle.attempt?.gave_up)) {
+            void clearPuzzleDraft(draftOwner, puzzle.id).catch(() => {});
+        }
+    }, [draftOwner, puzzle?.id, puzzle?.solved, puzzle?.attempt?.solved, puzzle?.attempt?.gave_up]);
+
     const currentIncorrectGuesses =
         sessionIncorrectGuesses ?? puzzle?.attempt?.incorrect_guesses ?? 0;
     const currentOpenedAt = sessionOpenedAt ?? puzzle?.attempt?.opened_at ?? null;
@@ -116,9 +125,13 @@ export function TodayPuzzleScreen() {
             const storedGuestResult =
                 token || hasServerCompletion ? null : getGuestPuzzleResult(puzzle.id);
             setGuestResult(storedGuestResult);
+            if (storedGuestResult) void clearPuzzleDraft('guest', puzzle.id).catch(() => {});
             if (!token && !hasServerCompletion && !storedGuestResult) {
                 getGuestPuzzleResultAsync(puzzle.id).then((result) => {
-                    if (result) setGuestResult((current) => current ?? result);
+                    if (result) {
+                        void clearPuzzleDraft('guest', puzzle.id).catch(() => {});
+                        setGuestResult((current) => current ?? result);
+                    }
                 });
             }
             const { hints, baseline } = getPuzzleHintSession(
@@ -126,7 +139,8 @@ export function TodayPuzzleScreen() {
                 'today',
                 userKey,
                 puzzle.id,
-                puzzle.attempt?.hint_used ?? 0
+                puzzle.attempt?.hint_used ?? 0,
+                puzzle.revealed_hint
             );
             setSessionHints(hints);
             setSessionHintBaseline(baseline);
@@ -140,18 +154,21 @@ export function TodayPuzzleScreen() {
         setSessionIncorrectGuesses(null);
         setSessionOpenedAt(null);
         setSubmitError('');
+        setHintError('');
     }, [
         queryClient,
         token,
         userKey,
         puzzle?.id,
         puzzle?.attempt?.hint_used,
+        puzzle?.revealed_hint,
         puzzle?.attempt?.solved,
         puzzle?.attempt?.gave_up,
     ]);
 
     const handleTerminalResult = (data: AttemptResponse) => {
         setLocalResult(data);
+        if (puzzle) void clearPuzzleDraft(draftOwner, puzzle.id).catch(() => {});
         if (!token && puzzle) {
             setGuestPuzzleResult(puzzle, data);
             setGuestResult(data);
@@ -200,13 +217,20 @@ export function TodayPuzzleScreen() {
     });
 
     const hintMutation = useMutation({
-        mutationFn: () => puzzleApi.hint(token, puzzle!.id),
-        onSuccess: (data) =>
+        mutationFn: () => puzzleApi.hint(token, puzzle!.id, totalHintsUsed),
+        onSuccess: (data) => {
+            setHintError('');
             setSessionHints((prev) => {
                 const next = [...prev, data.hint];
                 setPuzzleHintSessionHints(queryClient, 'today', userKey, puzzle!.id, next);
                 return next;
-            }),
+            });
+        },
+        onError: (err) => {
+            setHintError(
+                err instanceof ApiError ? err.message : 'Could not reveal the next hint. Try again.'
+            );
+        },
     });
 
     const giveUpMutation = useMutation({
@@ -291,9 +315,29 @@ export function TodayPuzzleScreen() {
                             <ResultView puzzle={puzzle} result={displayResult} />
                         ) : (
                             <PuzzleRenderer
+                                draftOwner={draftOwner}
+                                draftToken={token}
+                                progressMetadata={{
+                                    opened_at: currentOpenedAt,
+                                    incorrect_guesses: currentIncorrectGuesses,
+                                    hint_used: totalHintsUsed,
+                                    hints: sessionHints,
+                                }}
+                                onRestoreProgress={(saved) => {
+                                    setSessionOpenedAt(saved.opened_at);
+                                    setSessionIncorrectGuesses(saved.incorrect_guesses);
+                                    setSessionHints(saved.hints);
+                                    setSessionHintBaseline(
+                                        Math.max(0, saved.hint_used - saved.hints.length)
+                                    );
+                                }}
+                                onReloadProgress={() => {
+                                    void refetch();
+                                }}
                                 puzzle={puzzle}
                                 onSubmit={handleSubmit}
                                 onHint={handleHint}
+                                hintError={hintError}
                                 onGiveUp={handleGiveUp}
                                 isSubmitting={isPuzzleRequestPending}
                                 isHinting={isPuzzleRequestPending}

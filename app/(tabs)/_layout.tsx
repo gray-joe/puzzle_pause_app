@@ -24,12 +24,17 @@ export default function TabsLayout() {
         >
             <Tabs.Screen
                 name="(calendar)"
-                options={{ title: 'Calendar', tabBarIcon: tabIcon('today-outline', 'today') }}
+                options={{
+                    title: 'Calendar',
+                    tabBarButtonTestID: 'tab-calendar',
+                    tabBarIcon: tabIcon('today-outline', 'today'),
+                }}
             />
             <Tabs.Screen
                 name="archive"
                 options={{
                     title: 'Archive',
+                    tabBarButtonTestID: 'tab-archive',
                     tabBarIcon: tabIcon('albums-outline', 'albums'),
                 }}
                 listeners={{
@@ -45,7 +50,11 @@ export default function TabsLayout() {
             />
             <Tabs.Screen
                 name="account"
-                options={{ title: 'Account', tabBarIcon: tabIcon('person-outline', 'person') }}
+                options={{
+                    title: 'Account',
+                    tabBarButtonTestID: 'tab-account',
+                    tabBarIcon: tabIcon('person-outline', 'person'),
+                }}
             />
         </Tabs>
     );

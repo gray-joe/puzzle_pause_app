@@ -55,6 +55,7 @@ export default function CodeScreen() {
                     </Text>
                 </View>
                 <TextInput
+                    testID="auth-code"
                     label="6-character code"
                     value={code}
                     onChangeText={(t) => setCode(t.toUpperCase())}
@@ -66,7 +67,12 @@ export default function CodeScreen() {
                     onSubmitEditing={handleSubmit}
                     returnKeyType="done"
                 />
-                <Button title="Verify" onPress={handleSubmit} loading={loading} />
+                <Button
+                    testID="auth-verify"
+                    title="Verify"
+                    onPress={handleSubmit}
+                    loading={loading}
+                />
             </View>
         </Screen>
     );

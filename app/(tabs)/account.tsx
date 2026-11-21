@@ -8,6 +8,7 @@ import type { AccountStats } from '../../src/api/schemas';
 import { useSession } from '../../src/auth/useSession';
 import { Button } from '../../src/components/Button';
 import { GuestPrompt } from '../../src/components/GuestPrompt';
+import { DailyReminderSettings } from '../../src/components/DailyReminderSettings';
 import { QueryStateView } from '../../src/components/QueryStateView';
 import { Screen } from '../../src/components/Screen';
 import { TextInput } from '../../src/components/TextInput';
@@ -46,7 +47,11 @@ export default function AccountScreen() {
     });
 
     if (!session) {
-        return <GuestPrompt message="Sign in to manage your account and view your stats." />;
+        return (
+            <GuestPrompt message="Sign in to manage your account and view your stats.">
+                <DailyReminderSettings />
+            </GuestPrompt>
+        );
     }
 
     const handleRefresh = async () => {
@@ -78,7 +83,14 @@ export default function AccountScreen() {
                     )}
                 </QueryStateView>
 
-                <Button title="Sign out" variant="secondary" onPress={signOut} />
+                <DailyReminderSettings />
+
+                <Button
+                    testID="account-sign-out"
+                    title="Sign out"
+                    variant="secondary"
+                    onPress={signOut}
+                />
 
                 {deleteError ? (
                     <Text style={[typography.body, { color: colors.error, textAlign: 'center' }]}>

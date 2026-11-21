@@ -47,9 +47,12 @@ const PuzzleBase = z.object({
     puzzle_name: z.string(),
     puzzle_number: z.number(),
     puzzle_type: z.string(),
+    // Exact source required by the progress API's question/version precondition.
+    raw_question: z.string().optional(),
     hint: z.string().nullable(),
     has_hint: z.boolean(),
     total_hints: z.number(),
+    revealed_hint: z.string().nullable().optional(),
     attempt: AttemptStateSchema.nullable().optional(),
     solved: z.boolean().optional(),
     answer: z.string().nullable().optional(),
@@ -296,9 +299,9 @@ const crosswordQuestionSchema = z
     .object({
         prompt: z.string(),
         layout: z
-            .array(z.string().regex(/^[.#]{3,15}$/))
+            .array(z.string().regex(/^[.#]{3,25}$/))
             .min(3)
-            .max(15),
+            .max(25),
         clues: z.object({
             across: z.record(z.string(), z.string()),
             down: z.record(z.string(), z.string()),
@@ -324,9 +327,9 @@ const codewordQuestionSchema = z
     .object({
         prompt: z.string(),
         cells: z
-            .array(z.array(z.number().int().min(0).max(26)).min(3).max(15))
+            .array(z.array(z.number().int().min(0).max(26)).min(3).max(25))
             .min(3)
-            .max(15),
+            .max(25),
         givens: z.record(z.string(), z.string().regex(/^[A-Za-z]$/)),
     })
     .refine((data) => data.cells.every((row) => row.length === data.cells[0]!.length), {
@@ -465,7 +468,7 @@ const UnsupportedPuzzleSchema = z.object({
     question: z.string(),
 });
 
-export const PuzzleSchema = z.union([
+const ParsedPuzzleSchema = z.union([
     WordPuzzleSchema,
     MathPuzzleSchema,
     LadderPuzzleSchema,
@@ -490,6 +493,20 @@ export const PuzzleSchema = z.union([
     ClueRevealPuzzleSchema,
     UnsupportedPuzzleSchema,
 ]);
+
+export const PuzzleSchema = z.preprocess((value) => {
+    if (
+        value &&
+        typeof value === 'object' &&
+        'puzzle_type' in value &&
+        ['sudoku', 'crossword', 'codeword'].includes(String(value.puzzle_type)) &&
+        'question' in value &&
+        typeof value.question === 'string'
+    ) {
+        return { ...value, raw_question: value.question };
+    }
+    return value;
+}, ParsedPuzzleSchema);
 
 export type Puzzle = z.infer<typeof PuzzleSchema>;
 export type WordPuzzle = z.infer<typeof WordPuzzleSchema>;
@@ -519,6 +536,7 @@ export type TextPuzzle = WordPuzzle | MathPuzzle | LadderPuzzle;
 // POST /puzzle/attempt response
 export const AttemptResponseSchema = z.object({
     correct: z.boolean(),
+    length_penalty_applied: z.boolean().optional(),
     score: z.number().nullable(),
     incorrect_guesses: z.number(),
     solved: z.boolean(),

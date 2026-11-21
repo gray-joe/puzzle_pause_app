@@ -23,6 +23,8 @@ import type {
     WordsearchPuzzle,
 } from '../../api/schemas';
 import { Alert, Text, View } from 'react-native';
+import { PuzzleDraftProvider, type PuzzleProgressProps } from './PuzzleDraftProvider';
+import { draftFingerprint } from '../../lib/puzzleDrafts';
 import { useTheme } from '../../theme';
 import { Button } from '../Button';
 import { PuzzleCompletionStats } from '../PuzzleCompletionStats';
@@ -58,16 +60,25 @@ export type PuzzleInteractionProps = {
     isHinting: boolean;
     isGivingUp: boolean;
     submitError?: string;
+    hintError?: string;
     hintsRevealed: string[];
     canHint: boolean;
 };
 
-type Props = { puzzle: Puzzle } & PuzzleInteractionProps;
+type Props = { puzzle: Puzzle; draftOwner?: string } & PuzzleInteractionProps & PuzzleProgressProps;
 
 const SCORING_NOTE =
     'Solve within 10 mins for 100 pts, 15 mins for 90, 30 mins for 75, 60 mins for 50. -5 per wrong guess, -10 for a hint.';
 
-export function PuzzleRenderer({ puzzle, ...rest }: Props) {
+export function PuzzleRenderer({
+    puzzle,
+    draftOwner,
+    draftToken,
+    progressMetadata,
+    onRestoreProgress,
+    onReloadProgress,
+    ...rest
+}: Props) {
     const { colors, spacing, typography } = useTheme();
     const isInteractionDisabled = rest.isSubmitting || rest.isHinting || rest.isGivingUp;
     const confirmGiveUp = () => {
@@ -155,7 +166,31 @@ export function PuzzleRenderer({ puzzle, ...rest }: Props) {
 
     return (
         <View style={{ flex: 1, justifyContent: 'center', gap: spacing.lg }}>
-            <View pointerEvents={isInteractionDisabled ? 'none' : 'auto'}>{content}</View>
+            <View pointerEvents={isInteractionDisabled ? 'none' : 'auto'}>
+                {draftOwner && ['sudoku', 'crossword', 'codeword'].includes(puzzle.puzzle_type) ? (
+                    <PuzzleDraftProvider
+                        key={`${draftOwner}:${draftToken ?? ''}:${puzzle.id}:${draftFingerprint(puzzle)}:${puzzle.raw_question ?? ''}`}
+                        owner={draftOwner}
+                        puzzle={puzzle}
+                        draftToken={draftToken}
+                        progressMetadata={progressMetadata}
+                        onRestoreProgress={onRestoreProgress}
+                        onReloadProgress={onReloadProgress}
+                    >
+                        {content}
+                    </PuzzleDraftProvider>
+                ) : (
+                    content
+                )}
+            </View>
+            {rest.hintError ? (
+                <Text
+                    accessibilityRole="alert"
+                    style={[typography.caption, { color: colors.error }]}
+                >
+                    {rest.hintError}
+                </Text>
+            ) : null}
             {showScoringNote && (
                 <Text
                     style={[

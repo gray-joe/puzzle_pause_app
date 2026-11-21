@@ -58,6 +58,26 @@ npm run test:watch
 npm run test:coverage
 ```
 
+## iOS E2E tests
+
+With the local backend running and seeded, use Maestro to test a standalone iOS
+Simulator build:
+
+```sh
+npm run e2e:ios:build  # Build/install once; rebuild after app changes
+npm run e2e:ios        # Run the native smoke suite
+```
+
+See [docs/e2e-ios.md](docs/e2e-ios.md) for prerequisites, database paths and coverage.
+
+## Daily reminders
+
+Optional on-device daily reminders are available from **Account**, including for guests. They
+use the device's local time, need no backend, and still fire if the day's puzzle is already
+complete. A new native build is required for the notification module; an OTA update alone
+is not sufficient. See [docs/daily_reminders.md](docs/daily_reminders.md) for behavior,
+compliance notes, and the device-testing checklist.
+
 ## Store submission docs
 
 - `docs/store/phase8_store_submission.md` - metadata copy, screenshot checklist, and runbook

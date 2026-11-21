@@ -49,10 +49,15 @@ export async function attempt(
     });
 }
 
-export async function hint(token: string | null, id: number): Promise<HintResponse> {
+export async function hint(
+    token: string | null,
+    id: number,
+    hintsRevealed = 0
+): Promise<HintResponse> {
     return apiRequest(`/archive/${id}/hint`, HintResponseSchema, {
         method: 'POST',
         token,
+        ...(!token ? { body: { hints_revealed: hintsRevealed } } : {}),
     });
 }
 

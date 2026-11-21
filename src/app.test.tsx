@@ -1,4 +1,7 @@
 import React from 'react';
+import { act } from 'react-test-renderer';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { PuzzleSchema } from './api/schemas';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Alert } from 'react-native';
 import {
@@ -68,6 +71,8 @@ const mocks = vi.hoisted(() => {
         puzzleHint: vi.fn(),
         puzzleGiveUp: vi.fn(),
         puzzleResult: vi.fn(),
+        progressGet: vi.fn(),
+        progressSave: vi.fn(),
         signIn: vi.fn(),
         signOut: vi.fn(),
         refetch: vi.fn(),
@@ -124,6 +129,11 @@ vi.mock('./api/leagues', () => ({
 vi.mock('./auth/SessionContext', () => ({
     SessionProvider: ({ children }: { children: React.ReactNode }) =>
         React.createElement('SessionProvider', null, children),
+}));
+
+vi.mock('./api/progress', () => ({
+    getProgress: mocks.progressGet,
+    saveProgress: mocks.progressSave,
 }));
 
 vi.mock('./api/puzzle', () => ({
@@ -542,6 +552,68 @@ describe('today landing route', () => {
     });
 });
 
+describe.each(['today', 'archive'] as const)('%s clue reveal', (scope) => {
+    async function renderCluePuzzle(guest: boolean) {
+        if (guest) setSession(null);
+        const puzzle = {
+            ...wordPuzzle,
+            puzzle_type: 'clue-reveal',
+            question: { prompt: 'What am I?', clues: ['First clue'] },
+        };
+        mocks.useQuery.mockImplementation((options) => ({
+            data: ['today', 'detail'].includes(options.queryKey[1]) ? puzzle : undefined,
+            isLoading: false,
+            error: null,
+            refetch: mocks.refetch,
+        }));
+        localSearchParamsMock.mockReturnValue({ id: String(puzzle.id) });
+        const { default: PuzzleScreen } =
+            scope === 'today'
+                ? await import('../app/(tabs)/(calendar)/puzzle')
+                : await import('../app/(tabs)/archive/[id]');
+        return render(<PuzzleScreen />);
+    }
+
+    it.each([true, false])(
+        'reveals sequential clues and stops when exhausted (guest=%s)',
+        async (guest) => {
+            const hint = scope === 'today' ? mocks.puzzleHint : mocks.archiveHint;
+            hint.mockReturnValueOnce({ hint: 'Second clue', total_hints: 2 });
+            hint.mockReturnValueOnce({ hint: 'Third clue', total_hints: 2 });
+            const renderer = await renderCluePuzzle(guest);
+
+            expect(allText(renderer)).toContain('First clue');
+            expect(allText(renderer)).not.toContain('Second clue');
+            press(findPressableByText(renderer, 'Next clue')!);
+            expect(hint).toHaveBeenLastCalledWith(guest ? null : 'jwt-token', 11, 0);
+            expect(allText(renderer)).toContain('Second clue');
+
+            press(findPressableByText(renderer, 'Next clue')!);
+            expect(hint).toHaveBeenLastCalledWith(guest ? null : 'jwt-token', 11, 1);
+            expect(allText(renderer)).toContain('Third clue');
+            expect(findPressableByText(renderer, 'Next clue')).toBeUndefined();
+        }
+    );
+
+    it('shows failed clue requests and allows retry without advancing the counter', async () => {
+        const hint = scope === 'today' ? mocks.puzzleHint : mocks.archiveHint;
+        hint.mockImplementationOnce(() => {
+            throw new Error('Network unavailable');
+        });
+        hint.mockReturnValueOnce({ hint: 'Second clue', total_hints: 2 });
+        const renderer = await renderCluePuzzle(true);
+
+        press(findPressableByText(renderer, 'Next clue')!);
+        expect(allText(renderer)).toContain('Could not reveal the next hint. Try again.');
+        expect(allText(renderer)).not.toContain('Second clue');
+
+        press(findPressableByText(renderer, 'Next clue')!);
+        expect(hint).toHaveBeenLastCalledWith(null, 11, 0);
+        expect(allText(renderer)).toContain('Second clue');
+        expect(allText(renderer)).not.toContain('Could not reveal');
+    });
+});
+
 describe('today puzzle route', () => {
     it('renders today puzzle and handles incorrect attempts and hints', async () => {
         mocks.useQuery.mockImplementation((options) => {
@@ -578,7 +650,7 @@ describe('today puzzle route', () => {
 
         press(findPressableByText(renderer, 'Hint')!);
 
-        expect(mocks.puzzleHint).toHaveBeenCalledWith(null, 11);
+        expect(mocks.puzzleHint).toHaveBeenCalledWith(null, 11, 0);
         expect(allText(renderer)).toContain('Hint: Guest hint');
     });
 
@@ -760,6 +832,11 @@ describe('today puzzle route', () => {
 
         expect(allText(secondRenderer)).toContain('Hint: Remember this');
         expect(mocks.puzzleAttempt).toHaveBeenCalledWith(null, 11, 'answer', null, 0, 1);
+        mocks.puzzleHint.mockReturnValueOnce({ hint: 'Second hint', total_hints: 2 });
+        press(findPressableByText(secondRenderer, 'Hint')!);
+        expect(mocks.puzzleHint).toHaveBeenLastCalledWith(null, 11, 1);
+        expect(allText(secondRenderer)).toContain('Hint: Second hint');
+        expect(findPressableByText(secondRenderer, 'Hint')).toBeUndefined();
     });
 
     it('shows today scores for guests', async () => {
@@ -1014,7 +1091,7 @@ describe('archive routes', () => {
         press(findPressableByText(renderer, 'Hint')!);
         press(findPressableByText(renderer, 'Submit')!);
 
-        expect(mocks.archiveHint).toHaveBeenCalledWith('jwt-token', 11);
+        expect(mocks.archiveHint).toHaveBeenCalledWith('jwt-token', 11, 0);
         expect(mocks.archiveAttempt).toHaveBeenCalledWith('jwt-token', 11, 'answer', null, 0, 1);
         expect(allText(renderer)).toContain('Solved!');
         expect(allText(renderer)).toContain('Score');
@@ -1057,7 +1134,7 @@ describe('archive routes', () => {
 
         press(findPressableByText(renderer, 'Hint')!);
 
-        expect(mocks.archiveHint).toHaveBeenCalledWith(null, 11);
+        expect(mocks.archiveHint).toHaveBeenCalledWith(null, 11, 0);
         expect(allText(renderer)).toContain('Hint: Guest archive hint');
     });
 
@@ -1115,6 +1192,11 @@ describe('archive routes', () => {
 
         expect(allText(secondRenderer)).toContain('Hint: Remember archive hint');
         expect(mocks.archiveAttempt).toHaveBeenCalledWith(null, 11, 'answer', null, 0, 1);
+        mocks.archiveHint.mockReturnValueOnce({ hint: 'Second archive hint', total_hints: 2 });
+        press(findPressableByText(secondRenderer, 'Hint')!);
+        expect(mocks.archiveHint).toHaveBeenLastCalledWith(null, 11, 1);
+        expect(allText(secondRenderer)).toContain('Hint: Second archive hint');
+        expect(findPressableByText(secondRenderer, 'Hint')).toBeUndefined();
     });
 
     it('prompts guests to sign in after viewing solved archive results', async () => {
@@ -1375,5 +1457,64 @@ describe('league routes', () => {
             queryKey: ['leagues', 'detail', 3, 'jwt-token'],
         });
         expect(routerMock.back).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe.each(['today', 'archive'] as const)('%s account grid progress', (scope) => {
+    it('restores authoritative metadata for submissions and clears local progress on give-up', async () => {
+        const grid = PuzzleSchema.parse({
+            ...wordPuzzle,
+            puzzle_type: 'sudoku',
+            question: JSON.stringify({ prompt: 'Sudoku', grid: '0'.repeat(81) }),
+        });
+        mocks.useQuery.mockImplementation((options) => ({
+            data: ['today', 'detail'].includes(options.queryKey[1]) ? grid : undefined,
+            isLoading: false,
+            error: null,
+            refetch: mocks.refetch,
+        }));
+        localSearchParamsMock.mockReturnValue({ id: String(grid.id) });
+        mocks.progressGet.mockResolvedValue({
+            version: 3,
+            question: grid.raw_question,
+            entries: Array(81).fill('1'),
+            completed: false,
+            opened_at: '2026-05-07T01:00:00',
+            incorrect_guesses: 3,
+            hint_used: 1,
+            hint: 'Restored hint',
+        });
+        const attempt = scope === 'today' ? mocks.puzzleAttempt : mocks.archiveAttempt;
+        const giveUp = scope === 'today' ? mocks.puzzleGiveUp : mocks.archiveGiveUp;
+        attempt.mockReturnValue({ correct: false, solved: false, incorrect_guesses: 4 });
+        giveUp.mockReturnValue({
+            correct: false,
+            solved: false,
+            gave_up: true,
+            score: 0,
+            incorrect_guesses: 4,
+            answer: '1'.repeat(81),
+        });
+        const Component =
+            scope === 'today'
+                ? (await import('./screens/TodayPuzzleScreen')).TodayPuzzleScreen
+                : (await import('../app/(tabs)/archive/[id]')).default;
+        const view = render(<Component />);
+        await act(async () => {});
+        expect(allText(view)).toContain('Restored hint');
+        press(findPressableByText(view, 'Submit')!);
+        expect(attempt).toHaveBeenCalledWith(
+            'jwt-token',
+            grid.id,
+            '1'.repeat(81),
+            '2026-05-07T01:00:00Z',
+            3,
+            1
+        );
+        press(findPressableByText(view, 'Give up (score 0)')!);
+        confirmGiveUp();
+        await act(async () => {});
+        expect(AsyncStorage.removeItem).toHaveBeenCalledWith(`pp_draft_v1:user%3A7:${grid.id}`);
+        act(() => view.unmount());
     });
 });

@@ -1,0 +1,112 @@
+appId: app.puzzlepause.mobile.e2e
+name: iOS smoke — local dev API
+---
+- launchApp
+- openLink: puzzlepause-e2e://e2e/reset
+- extendedWaitUntil:
+    visible:
+      id: calendar-today
+    timeout: 15000
+
+# Navigate through the calendar without depending on today's puzzle type.
+- tapOn:
+    id: calendar-today
+- tapOn:
+    id: tab-archive
+- extendedWaitUntil:
+    visible: Archive
+    timeout: 10000
+
+# Known archive fixture from backend/seed_dev.py: Welcome to Puzzle Pause.
+- openLink: puzzlepause-e2e://archive/1
+- extendedWaitUntil:
+    visible:
+      id: puzzle-answer
+    timeout: 10000
+- tapOn:
+    id: puzzle-answer
+- inputText: '0'
+- hideKeyboard
+- tapOn:
+    id: puzzle-submit
+- assertVisible: 'Not quite — try again!'
+- tapOn:
+    id: puzzle-answer
+- eraseText
+- inputText: '45'
+- hideKeyboard
+- tapOn:
+    id: puzzle-submit
+- extendedWaitUntil:
+    visible:
+      id: puzzle-result
+    timeout: 10000
+- assertVisible: 'Solved!'
+
+# Relaunch must retain guest completion. Do not clear state here.
+- stopApp
+- launchApp
+- openLink: puzzlepause-e2e://archive/1
+- extendedWaitUntil:
+    visible:
+      id: puzzle-result
+    timeout: 10000
+- assertVisible: 'Solved!'
+
+# Another seeded text puzzle: Night.
+- openLink: puzzlepause-e2e://archive/2
+- extendedWaitUntil:
+    visible:
+      id: puzzle-answer
+    timeout: 10000
+- tapOn:
+    id: puzzle-answer
+- inputText: Night
+- hideKeyboard
+- tapOn:
+    id: puzzle-submit
+- extendedWaitUntil:
+    visible:
+      id: puzzle-result
+    timeout: 10000
+- assertVisible: 'Solved!'
+
+# One full native sign-in; host-side SQLite helper replaces email polling.
+- openLink: puzzlepause-e2e://email
+- extendedWaitUntil:
+    visible:
+      id: auth-email
+    timeout: 10000
+- tapOn:
+    id: auth-email
+- inputText: ${E2E_EMAIL}
+- hideKeyboard
+- runScript: scripts/login-watermark.js
+- tapOn:
+    id: auth-send-code
+- extendedWaitUntil:
+    visible:
+      id: auth-code
+    timeout: 10000
+- runScript: scripts/login-code.js
+- tapOn:
+    id: auth-code
+- inputText: ${output.loginCode}
+- hideKeyboard
+- tapOn:
+    id: auth-verify
+- extendedWaitUntil:
+    visible:
+      id: calendar-today
+    timeout: 10000
+- tapOn:
+    id: tab-account
+- scrollUntilVisible:
+    element:
+      id: account-sign-out
+    direction: DOWN
+- tapOn:
+    id: account-sign-out
+- extendedWaitUntil:
+    visible: Sign in to manage your account and view your stats.
+    timeout: 10000

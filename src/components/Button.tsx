@@ -5,6 +5,7 @@ type Variant = 'primary' | 'secondary';
 
 type Props = {
     title: string;
+    testID?: string;
     onPress?: () => void;
     variant?: Variant;
     loading?: boolean;
@@ -14,6 +15,7 @@ type Props = {
 
 export function Button({
     title,
+    testID,
     onPress,
     variant = 'primary',
     loading = false,
@@ -26,6 +28,7 @@ export function Button({
 
     return (
         <Pressable
+            testID={testID}
             onPress={onPress}
             disabled={isDisabled}
             accessibilityRole="button"

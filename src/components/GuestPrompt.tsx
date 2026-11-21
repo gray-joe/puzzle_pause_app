@@ -1,5 +1,5 @@
 import { useMutation } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Text, View } from 'react-native';
 import { login, verify } from '../api/auth';
 import { ApiError } from '../api/client';
@@ -13,9 +13,10 @@ type Step = 'prompt' | 'email' | 'code';
 
 type Props = {
     message: string;
+    children?: ReactNode;
 };
 
-export function GuestPrompt({ message }: Props) {
+export function GuestPrompt({ message, children }: Props) {
     const [step, setStep] = useState<Step>('prompt');
     const [email, setEmail] = useState('');
     const { colors, spacing, typography } = useTheme();
@@ -36,7 +37,7 @@ export function GuestPrompt({ message }: Props) {
     }
 
     return (
-        <Screen>
+        <Screen scrollable={!!children}>
             <View
                 style={{
                     flex: 1,
@@ -50,6 +51,7 @@ export function GuestPrompt({ message }: Props) {
                     {message}
                 </Text>
                 <Button title="Sign in" onPress={() => setStep('email')} />
+                {children ? <View style={{ alignSelf: 'stretch' }}>{children}</View> : null}
             </View>
         </Screen>
     );

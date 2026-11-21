@@ -4,6 +4,7 @@ import type { CodewordPuzzle } from '../../api/schemas';
 import { useTheme } from '../../theme';
 import { GridBoard, GridKeyInput, GridPuzzleFrame } from './grid';
 import type { PuzzleInteractionProps } from './PuzzleRenderer';
+import { useDraftState } from './PuzzleDraftProvider';
 
 type Props = { puzzle: CodewordPuzzle } & PuzzleInteractionProps;
 
@@ -13,10 +14,30 @@ export function CodewordPuzzleView({ puzzle, onSubmit, ...rest }: Props) {
     const codes = cells.flat();
     const isGiven = (code: number) => String(code) in givens;
     // Letters are stored per code: filling one cell fills every cell with the same code.
-    const [letters, setLetters] = useState<Record<number, string>>(() =>
+    const initialLetters = () =>
         Object.fromEntries(
             Object.entries(givens).map(([code, l]) => [Number(code), l.toUpperCase()])
-        )
+        );
+    const [letters, setLetters] = useDraftState<Record<number, string>>(
+        'letters',
+        initialLetters,
+        (value) => {
+            if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+            const restored = initialLetters();
+            for (const [code, letter] of Object.entries(value)) {
+                if (
+                    !/^[1-9]\d*$/.test(code) ||
+                    !codes.includes(Number(code)) ||
+                    typeof letter !== 'string' ||
+                    !/^[A-Z]$/.test(letter)
+                )
+                    return undefined;
+                if (!isGiven(Number(code))) restored[Number(code)] = letter;
+            }
+            return new Set(Object.values(restored)).size === Object.keys(restored).length
+                ? restored
+                : undefined;
+        }
     );
     const [selected, setSelected] = useState(() => codes.findIndex((c) => c > 0 && !isGiven(c)));
     const [message, setMessage] = useState('');

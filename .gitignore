@@ -41,4 +41,10 @@ yarn-error.*
 /ios
 /android
 
-docs/
+docs/*
+!docs/daily_reminders.md
+!docs/e2e-ios.md
+
+# Native E2E artifacts
+/e2e-results/
+/scripts/__pycache__/

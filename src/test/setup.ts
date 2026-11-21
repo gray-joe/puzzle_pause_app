@@ -44,6 +44,8 @@ const FlatList = ({ data = [], renderItem, keyExtractor, ...props }: Record<stri
 vi.mock('react-native', () => ({
     ActivityIndicator: nativeComponent('ActivityIndicator'),
     Alert: { alert: vi.fn() },
+    AppState: { addEventListener: vi.fn(() => ({ remove: vi.fn() })) },
+    Linking: { openSettings: vi.fn(() => Promise.resolve()) },
     FlatList,
     Image: nativeComponent('Image'),
     Pressable: nativeComponent('Pressable'),
@@ -110,6 +112,18 @@ vi.mock('expo-status-bar', () => ({
 
 vi.mock('expo-clipboard', () => ({
     setStringAsync: clipboardSetStringAsyncMock,
+}));
+
+vi.mock('@react-native-community/netinfo', () => ({
+    default: { addEventListener: vi.fn(() => vi.fn()) },
+}));
+
+vi.mock('@react-native-async-storage/async-storage', () => ({
+    default: {
+        getItem: vi.fn(async () => null),
+        setItem: vi.fn(async () => {}),
+        removeItem: vi.fn(async () => {}),
+    },
 }));
 
 vi.mock('expo-secure-store', () => ({

@@ -23,6 +23,14 @@
                 "EXPO_PUBLIC_APP_ENV": "preview"
             }
         },
+        "e2e-ios": {
+            "extends": "preview",
+            "env": {
+                "EXPO_PUBLIC_API_BASE_URL": "http://localhost:8000/api",
+                "EXPO_PUBLIC_APP_ENV": "e2e",
+                "EXPO_PUBLIC_SENTRY_DSN": ""
+            }
+        },
         "production": {
             "environment": "production",
             "autoIncrement": true,

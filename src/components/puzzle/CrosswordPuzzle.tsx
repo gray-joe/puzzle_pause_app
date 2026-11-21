@@ -1,17 +1,27 @@
 import { useMemo, useRef, useState } from 'react';
-import { TextInput as RNTextInput, Text, View } from 'react-native';
+import { Pressable, TextInput as RNTextInput, Text, View } from 'react-native';
 import type { CrosswordPuzzle } from '../../api/schemas';
 import { buildCrossword, wordCells, type Direction } from '../../lib/crossword';
 import { useTheme } from '../../theme';
 import { GridBoard, GridKeyInput, GridPuzzleFrame } from './grid';
 import type { PuzzleInteractionProps } from './PuzzleRenderer';
+import { useDraftState } from './PuzzleDraftProvider';
 
 type Props = { puzzle: CrosswordPuzzle } & PuzzleInteractionProps;
 
 export function CrosswordPuzzleView({ puzzle, onSubmit, ...rest }: Props) {
     const { layout, clues, prompt } = puzzle.question;
     const grid = useMemo(() => buildCrossword(layout), [layout]);
-    const [letters, setLetters] = useState<string[]>(() => grid.black.map(() => ''));
+    const [letters, setLetters] = useDraftState<string[]>(
+        'letters',
+        () => grid.black.map(() => ''),
+        (value) =>
+            Array.isArray(value) &&
+            value.length === grid.black.length &&
+            value.every((l) => typeof l === 'string' && /^[A-Z]?$/.test(l))
+                ? value.map((l: string, i: number) => (grid.black[i] ? '' : l))
+                : undefined
+    );
     const [selected, setSelected] = useState(() => grid.black.indexOf(false));
     const [direction, setDirection] = useState<Direction>('across');
     const inputRef = useRef<RNTextInput>(null);
@@ -109,9 +119,22 @@ export function CrosswordPuzzleView({ puzzle, onSubmit, ...rest }: Props) {
                     {Object.entries(clues[dir])
                         .sort(([a], [b]) => Number(a) - Number(b))
                         .map(([number, clue]) => (
-                            <Text key={number} style={[typography.caption, { color: colors.text }]}>
-                                {number}. {clue}
-                            </Text>
+                            <Pressable
+                                key={number}
+                                accessibilityRole="button"
+                                accessibilityLabel={`${number} ${dir}: ${clue}`}
+                                onPress={() => {
+                                    const index = grid.numbers.indexOf(Number(number));
+                                    if (index < 0) return;
+                                    setSelected(index);
+                                    setDirection(dir);
+                                    inputRef.current?.focus();
+                                }}
+                            >
+                                <Text style={[typography.caption, { color: colors.text }]}>
+                                    {number}. {clue}
+                                </Text>
+                            </Pressable>
                         ))}
                 </View>
             ))}

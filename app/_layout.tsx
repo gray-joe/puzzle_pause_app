@@ -8,12 +8,13 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { SessionProvider } from '../src/auth/SessionContext';
 import { useSession } from '../src/auth/useSession';
 import { queryClient } from '../src/lib/queryClient';
+import { DailyReminderNavigation } from '../src/components/DailyReminderNavigation';
 
 const navigationIntegration = Sentry.reactNavigationIntegration();
 
 Sentry.init({
     dsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
-    enabled: !!process.env.EXPO_PUBLIC_SENTRY_DSN,
+    enabled: process.env.EXPO_PUBLIC_APP_ENV !== 'e2e' && !!process.env.EXPO_PUBLIC_SENTRY_DSN,
     environment: process.env.EXPO_PUBLIC_APP_ENV ?? (__DEV__ ? 'development' : 'production'),
     integrations: [navigationIntegration],
     tracesSampleRate: __DEV__ ? 1.0 : 0.2,
@@ -41,7 +42,12 @@ function AuthGate() {
         );
     }
 
-    return <Stack screenOptions={{ headerShown: false }} />;
+    return (
+        <>
+            <Stack screenOptions={{ headerShown: false }} />
+            <DailyReminderNavigation />
+        </>
+    );
 }
 
 function RootLayout() {

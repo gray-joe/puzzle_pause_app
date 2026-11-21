@@ -97,6 +97,24 @@ describe('CrosswordPuzzleView', () => {
         expect(allText(renderer)).toContain('1 down: Farm animal');
     });
 
+    it('selects duplicate clues independently by number and direction', () => {
+        const { renderer } = renderPuzzle(
+            puzzle('crossword', {
+                prompt: '',
+                layout: ['...', '.#.', '...'],
+                clues: {
+                    across: { '1': 'Same clue', '3': 'Same clue' },
+                    down: { '1': 'Other clue' },
+                },
+            })
+        );
+        const clue = findAllByHost(renderer, 'Pressable').find(
+            (node) => node.props.accessibilityLabel === '3 across: Same clue'
+        )!;
+        press(clue);
+        expect(allText(renderer)).toContain('3 across: Same clue');
+    });
+
     it('backspace clears the square, then steps back through the word', () => {
         const { submit, type, backspace, cell } = renderPuzzle(crossword());
 
@@ -106,6 +124,42 @@ describe('CrosswordPuzzleView', () => {
         expect(textContent(cell(1, 1))).toBe('1'); // just the clue number
         expect(textContent(cell(1, 2))).toBe('');
         expect(submit().props.disabled).toBe(true);
+    });
+});
+
+describe.each(['crossword', 'codeword'])('%s large boards', (type) => {
+    it.each([
+        [25, 25],
+        [3, 25],
+        [25, 3],
+    ])('renders %i by %i with readable scrollable cells and answers', (rows, cols) => {
+        const p = puzzle(
+            type,
+            type === 'crossword'
+                ? {
+                      prompt: '',
+                      layout: Array(rows).fill('.'.repeat(cols)),
+                      clues: { across: {}, down: {} },
+                  }
+                : {
+                      prompt: '',
+                      cells: Array.from({ length: rows }, () => Array(cols).fill(1)),
+                      givens: {},
+                  }
+        );
+        const { renderer, cell, type: enter, onSubmit, submit } = renderPuzzle(p);
+        expect(findByHost(renderer, 'ScrollView').props.horizontal).toBe(true);
+        expect(cell(rows, cols).props.style.width).toBeGreaterThanOrEqual(32);
+        press(cell(rows, cols));
+        enter('z');
+        expect(textContent(cell(rows, cols))).toContain('Z');
+        if (type === 'codeword') {
+            press(submit());
+            expect(onSubmit).toHaveBeenCalledWith('Z'.repeat(rows * cols));
+        }
+        const answer = render(<PuzzleAnswer puzzle={p} answer={'A'.repeat(rows * cols)} />);
+        expect(findAllByHost(answer, 'Pressable')).toHaveLength(rows * cols);
+        expect(findAllByHost(answer, 'Pressable').every((node) => node.props.disabled)).toBe(true);
     });
 });
 

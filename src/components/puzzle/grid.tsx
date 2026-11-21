@@ -1,5 +1,12 @@
 import { forwardRef, type ReactNode } from 'react';
-import { Pressable, TextInput as RNTextInput, Text, View, useWindowDimensions } from 'react-native';
+import {
+    Pressable,
+    TextInput as RNTextInput,
+    ScrollView,
+    Text,
+    View,
+    useWindowDimensions,
+} from 'react-native';
 import { useTheme } from '../../theme';
 import { Button } from '../Button';
 
@@ -15,7 +22,7 @@ export type GridCell = {
 const MAX_CELL = 44;
 const CELL_GAP = 2;
 
-/** Square grid of cells, shrunk to fit the screen width. `groupSize` adds a wider gap between blocks (sudoku boxes). */
+/** Rectangular board; wide grids scroll rather than shrinking labels and touch targets. */
 export function GridBoard({
     cols,
     cells,
@@ -32,84 +39,91 @@ export function GridBoard({
     const groupGap = groupSize ? spacing.xs : 0;
     const groups = groupSize ? cols / groupSize - 1 : 0;
     const available = width - spacing.md * 2 - groups * groupGap;
-    const size = Math.min(MAX_CELL, Math.floor(available / cols) - CELL_GAP);
+    const size = Math.max(32, Math.min(MAX_CELL, Math.floor(available / cols) - CELL_GAP));
     const rows: GridCell[][] = [];
     for (let i = 0; i < cells.length; i += cols) rows.push(cells.slice(i, i + cols));
 
     return (
-        <View style={{ alignSelf: 'center' }}>
-            {rows.map((row, r) => (
-                <View
-                    key={r}
-                    style={{
-                        flexDirection: 'row',
-                        marginBottom: groupSize && (r + 1) % groupSize === 0 ? groupGap : 0,
-                    }}
-                >
-                    {row.map((cell, c) => {
-                        const index = r * cols + c;
-                        const background = cell.black
-                            ? scheme === 'dark'
-                                ? '#000000'
-                                : colors.text
-                            : cell.highlighted
-                              ? `${colors.primary}33`
-                              : colors.surface;
-                        return (
-                            <Pressable
-                                key={c}
-                                accessibilityLabel={
-                                    cell.black ? 'Black square' : `Row ${r + 1} column ${c + 1}`
-                                }
-                                disabled={!onPressCell || cell.black}
-                                onPress={() => onPressCell?.(index)}
-                                style={{
-                                    width: size,
-                                    height: size,
-                                    margin: CELL_GAP / 2,
-                                    marginRight:
-                                        CELL_GAP / 2 +
-                                        (groupSize && (c + 1) % groupSize === 0 && c + 1 < cols
-                                            ? groupGap
-                                            : 0),
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    borderRadius: 3,
-                                    borderWidth: cell.selected ? 2 : cell.black ? 0 : 1,
-                                    borderColor: cell.selected ? colors.primary : colors.border,
-                                    backgroundColor: background,
-                                }}
-                            >
-                                {cell.label != null && !cell.black && (
-                                    <Text
-                                        style={{
-                                            position: 'absolute',
-                                            top: 1,
-                                            left: 2,
-                                            fontSize: Math.max(7, size * 0.26),
-                                            color: colors.textMuted,
-                                        }}
-                                    >
-                                        {cell.label}
-                                    </Text>
-                                )}
-                                {!cell.black && (
-                                    <Text
-                                        style={{
-                                            fontSize: size * 0.55,
-                                            fontWeight: cell.given ? '700' : '400',
-                                            color: cell.given ? colors.text : colors.primary,
-                                        }}
-                                    >
-                                        {cell.value ?? ''}
-                                    </Text>
-                                )}
-                            </Pressable>
-                        );
-                    })}
-                </View>
-            ))}
-        </View>
+        <ScrollView
+            horizontal
+            accessibilityLabel="Puzzle grid"
+            style={{ maxWidth: '100%', alignSelf: 'center' }}
+            contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}
+        >
+            <View>
+                {rows.map((row, r) => (
+                    <View
+                        key={r}
+                        style={{
+                            flexDirection: 'row',
+                            marginBottom: groupSize && (r + 1) % groupSize === 0 ? groupGap : 0,
+                        }}
+                    >
+                        {row.map((cell, c) => {
+                            const index = r * cols + c;
+                            const background = cell.black
+                                ? scheme === 'dark'
+                                    ? '#000000'
+                                    : colors.text
+                                : cell.highlighted
+                                  ? `${colors.primary}33`
+                                  : colors.surface;
+                            return (
+                                <Pressable
+                                    key={c}
+                                    accessibilityLabel={
+                                        cell.black ? 'Black square' : `Row ${r + 1} column ${c + 1}`
+                                    }
+                                    disabled={!onPressCell || cell.black}
+                                    onPress={() => onPressCell?.(index)}
+                                    style={{
+                                        width: size,
+                                        height: size,
+                                        margin: CELL_GAP / 2,
+                                        marginRight:
+                                            CELL_GAP / 2 +
+                                            (groupSize && (c + 1) % groupSize === 0 && c + 1 < cols
+                                                ? groupGap
+                                                : 0),
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        borderRadius: 3,
+                                        borderWidth: cell.selected ? 2 : cell.black ? 0 : 1,
+                                        borderColor: cell.selected ? colors.primary : colors.border,
+                                        backgroundColor: background,
+                                    }}
+                                >
+                                    {cell.label != null && !cell.black && (
+                                        <Text
+                                            style={{
+                                                position: 'absolute',
+                                                top: 1,
+                                                left: 2,
+                                                fontSize: Math.max(7, size * 0.26),
+                                                color: colors.textMuted,
+                                            }}
+                                        >
+                                            {cell.label}
+                                        </Text>
+                                    )}
+                                    {!cell.black && (
+                                        <Text
+                                            style={{
+                                                fontSize: size * 0.55,
+                                                fontWeight: cell.given ? '700' : '400',
+                                                color: cell.given ? colors.text : colors.primary,
+                                            }}
+                                        >
+                                            {cell.value ?? ''}
+                                        </Text>
+                                    )}
+                                </Pressable>
+                            );
+                        })}
+                    </View>
+                ))}
+            </View>
+        </ScrollView>
     );
 }
 

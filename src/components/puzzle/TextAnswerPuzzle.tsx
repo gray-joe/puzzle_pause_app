@@ -55,6 +55,7 @@ export function TextAnswerPuzzle({
 
             <View style={{ gap: spacing.sm }}>
                 <TextInput
+                    testID="puzzle-answer"
                     label="Your answer"
                     value={guess}
                     onChangeText={setGuess}
@@ -65,6 +66,7 @@ export function TextAnswerPuzzle({
                     error={submitError}
                 />
                 <Button
+                    testID="puzzle-submit"
                     title="Submit"
                     onPress={handleSubmit}
                     loading={isSubmitting}

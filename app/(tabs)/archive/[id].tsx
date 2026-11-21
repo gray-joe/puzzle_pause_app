@@ -23,6 +23,7 @@ import {
 import { formatCompletionStats } from '../../../src/lib/puzzleAnswer';
 import { PuzzleAnswer } from '../../../src/components/puzzle/PuzzleAnswer';
 import { buildShareText, shareResult } from '../../../src/lib/shareResult';
+import { clearPuzzleDraft } from '../../../src/lib/puzzleDrafts';
 import { useTheme } from '../../../src/theme';
 
 export default function ArchiveDetailScreen() {
@@ -30,6 +31,7 @@ export default function ArchiveDetailScreen() {
     const id = Number(idParam);
     const { session } = useSession();
     const token = session?.token ?? null;
+    const draftOwner = session ? `user:${session.user.id}` : 'guest';
     const userKey = token ?? 'guest';
     const queryClient = useQueryClient();
     const { colors, spacing, typography } = useTheme();
@@ -49,7 +51,9 @@ export default function ArchiveDetailScreen() {
     const [sessionHints, setSessionHints] = useState<string[]>([]);
     const [sessionHintBaseline, setSessionHintBaseline] = useState(0);
     const [sessionIncorrectGuesses, setSessionIncorrectGuesses] = useState<number | null>(null);
+    const [sessionOpenedAt, setSessionOpenedAt] = useState<string | null>(null);
     const [submitError, setSubmitError] = useState('');
+    const [hintError, setHintError] = useState('');
     const [refreshing, setRefreshing] = useState(false);
     const giveUpPendingRef = useRef(false);
 
@@ -58,6 +62,7 @@ export default function ArchiveDetailScreen() {
 
     const handleTerminalResult = (data: AttemptResponse) => {
         setLocalResult(data);
+        if (puzzle) void clearPuzzleDraft(draftOwner, puzzle.id).catch(() => {});
         if (!token && puzzle) {
             setGuestPuzzleResult(puzzle, data);
             setGuestResult(data);
@@ -80,9 +85,17 @@ export default function ArchiveDetailScreen() {
 
     const attemptMutation = useMutation({
         mutationFn: (guess: string) =>
-            archiveApi.attempt(token, id, guess, null, currentIncorrectGuesses, totalHintsUsed),
+            archiveApi.attempt(
+                token,
+                id,
+                guess,
+                sessionOpenedAt ?? puzzle?.attempt?.opened_at ?? null,
+                currentIncorrectGuesses,
+                totalHintsUsed
+            ),
         onSuccess: (data) => {
             setSessionIncorrectGuesses(data.incorrect_guesses);
+            if (data.opened_at != null) setSessionOpenedAt(data.opened_at);
             if (data.gave_up || data.solved || data.correct) {
                 handleTerminalResult(data);
             } else {
@@ -97,13 +110,20 @@ export default function ArchiveDetailScreen() {
     });
 
     const hintMutation = useMutation({
-        mutationFn: () => archiveApi.hint(token, id),
-        onSuccess: (data) =>
+        mutationFn: () => archiveApi.hint(token, id, totalHintsUsed),
+        onSuccess: (data) => {
+            setHintError('');
             setSessionHints((prev) => {
                 const next = [...prev, data.hint];
                 setPuzzleHintSessionHints(queryClient, 'archive', userKey, id, next);
                 return next;
-            }),
+            });
+        },
+        onError: (err) => {
+            setHintError(
+                err instanceof ApiError ? err.message : 'Could not reveal the next hint. Try again.'
+            );
+        },
     });
 
     const giveUpMutation = useMutation({
@@ -145,14 +165,24 @@ export default function ArchiveDetailScreen() {
     const displayResult = localResult ?? initialResult ?? guestResult;
 
     useEffect(() => {
+        if (puzzle && (puzzle.solved || puzzle.attempt?.solved || puzzle.attempt?.gave_up)) {
+            void clearPuzzleDraft(draftOwner, puzzle.id).catch(() => {});
+        }
+    }, [draftOwner, puzzle?.id, puzzle?.solved, puzzle?.attempt?.solved, puzzle?.attempt?.gave_up]);
+
+    useEffect(() => {
         if (puzzle) {
             const hasServerCompletion = puzzle.attempt?.solved || puzzle.attempt?.gave_up;
             const storedGuestResult =
                 token || hasServerCompletion ? null : getGuestPuzzleResult(puzzle.id);
             setGuestResult(storedGuestResult);
+            if (storedGuestResult) void clearPuzzleDraft('guest', puzzle.id).catch(() => {});
             if (!token && !hasServerCompletion && !storedGuestResult) {
                 getGuestPuzzleResultAsync(puzzle.id).then((result) => {
-                    if (result) setGuestResult((current) => current ?? result);
+                    if (result) {
+                        void clearPuzzleDraft('guest', puzzle.id).catch(() => {});
+                        setGuestResult((current) => current ?? result);
+                    }
                 });
             }
             const { hints, baseline } = getPuzzleHintSession(
@@ -160,7 +190,8 @@ export default function ArchiveDetailScreen() {
                 'archive',
                 userKey,
                 id,
-                puzzle.attempt?.hint_used ?? 0
+                puzzle.attempt?.hint_used ?? 0,
+                puzzle.revealed_hint
             );
             setSessionHints(hints);
             setSessionHintBaseline(baseline);
@@ -172,13 +203,16 @@ export default function ArchiveDetailScreen() {
 
         setLocalResult(null);
         setSessionIncorrectGuesses(null);
+        setSessionOpenedAt(null);
         setSubmitError('');
+        setHintError('');
     }, [
         queryClient,
         token,
         userKey,
         id,
         puzzle?.attempt?.hint_used,
+        puzzle?.revealed_hint,
         puzzle?.attempt?.solved,
         puzzle?.attempt?.gave_up,
         puzzle?.id,
@@ -239,9 +273,29 @@ export default function ArchiveDetailScreen() {
                             <ArchiveResultView puzzle={puzzle} result={displayResult} />
                         ) : (
                             <PuzzleRenderer
+                                draftOwner={draftOwner}
+                                draftToken={token}
+                                progressMetadata={{
+                                    opened_at: sessionOpenedAt ?? puzzle.attempt?.opened_at ?? null,
+                                    incorrect_guesses: currentIncorrectGuesses,
+                                    hint_used: totalHintsUsed,
+                                    hints: sessionHints,
+                                }}
+                                onRestoreProgress={(saved) => {
+                                    setSessionOpenedAt(saved.opened_at);
+                                    setSessionIncorrectGuesses(saved.incorrect_guesses);
+                                    setSessionHints(saved.hints);
+                                    setSessionHintBaseline(
+                                        Math.max(0, saved.hint_used - saved.hints.length)
+                                    );
+                                }}
+                                onReloadProgress={() => {
+                                    void refetch();
+                                }}
                                 puzzle={puzzle}
                                 onSubmit={handleSubmit}
                                 onHint={handleHint}
+                                hintError={hintError}
                                 onGiveUp={handleGiveUp}
                                 isSubmitting={isPuzzleRequestPending}
                                 isHinting={isPuzzleRequestPending}
@@ -308,6 +362,7 @@ function ArchiveResultView({ puzzle, result }: ArchiveResultViewProps) {
                     #{puzzle.puzzle_number} · {puzzle.puzzle_name}
                 </Text>
                 <Text
+                    testID="puzzle-result"
                     style={[
                         typography.heading,
                         { color: result.gave_up ? colors.text : colors.success },

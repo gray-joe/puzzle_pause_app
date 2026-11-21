@@ -355,6 +355,7 @@ function CalendarDay({
 
     return (
         <Pressable
+            testID={cell.isCurrentPuzzleDate ? 'calendar-today' : `calendar-${cell.dateString}`}
             onPress={() => cell.route && onOpenRoute(cell.route)}
             accessibilityRole="button"
             accessibilityLabel={accessibilityLabel}

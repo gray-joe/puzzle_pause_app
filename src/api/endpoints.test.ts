@@ -113,6 +113,36 @@ describe('puzzle api', () => {
         });
     });
 
+    it('posts guest sequential hint counters', async () => {
+        await puzzleApi.hint(null, 12, 2);
+        expect(apiRequestMock).toHaveBeenCalledWith('/puzzle/hint', HintResponseSchema, {
+            method: 'POST',
+            token: null,
+            body: { puzzle_id: 12, hints_revealed: 2 },
+        });
+        await archiveApi.hint(null, 7, 1);
+        expect(apiRequestMock).toHaveBeenCalledWith('/archive/7/hint', HintResponseSchema, {
+            method: 'POST',
+            token: null,
+            body: { hints_revealed: 1 },
+        });
+    });
+
+    it('defaults guest hint counters to zero', async () => {
+        await puzzleApi.hint(null, 12);
+        expect(apiRequestMock).toHaveBeenCalledWith('/puzzle/hint', HintResponseSchema, {
+            method: 'POST',
+            token: null,
+            body: { puzzle_id: 12, hints_revealed: 0 },
+        });
+        await archiveApi.hint(null, 7);
+        expect(apiRequestMock).toHaveBeenCalledWith('/archive/7/hint', HintResponseSchema, {
+            method: 'POST',
+            token: null,
+            body: { hints_revealed: 0 },
+        });
+    });
+
     it('posts today puzzle give-up', async () => {
         await puzzleApi.giveUp('jwt', 12);
 

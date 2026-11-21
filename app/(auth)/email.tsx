@@ -57,6 +57,7 @@ export default function EmailScreen() {
                     </Text>
                 </View>
                 <TextInput
+                    testID="auth-email"
                     label="Email"
                     value={email}
                     onChangeText={setEmail}
@@ -68,7 +69,12 @@ export default function EmailScreen() {
                     onSubmitEditing={handleSubmit}
                     returnKeyType="done"
                 />
-                <Button title="Send code" onPress={handleSubmit} loading={loading} />
+                <Button
+                    testID="auth-send-code"
+                    title="Send code"
+                    onPress={handleSubmit}
+                    loading={loading}
+                />
             </View>
         </Screen>
     );
