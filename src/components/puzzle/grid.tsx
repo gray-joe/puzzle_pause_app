@@ -74,7 +74,35 @@ export function GridBoard({
                                     accessibilityLabel={
                                         cell.black ? 'Black square' : `Row ${r + 1} column ${c + 1}`
                                     }
-                                    disabled={!onPressCell || cell.black}
+                                    accessibilityRole={
+                                        onPressCell && !cell.black && !cell.given
+                                            ? 'button'
+                                            : 'text'
+                                    }
+                                    accessibilityValue={
+                                        cell.black
+                                            ? undefined
+                                            : {
+                                                  text: [
+                                                      cell.value || 'Empty',
+                                                      cell.label != null
+                                                          ? `number ${cell.label}`
+                                                          : '',
+                                                      cell.given
+                                                          ? 'given, not editable'
+                                                          : onPressCell
+                                                            ? 'editable'
+                                                            : 'read only',
+                                                  ]
+                                                      .filter(Boolean)
+                                                      .join(', '),
+                                              }
+                                    }
+                                    accessibilityState={{
+                                        selected: !!cell.selected,
+                                        disabled: !onPressCell || !!cell.black || !!cell.given,
+                                    }}
+                                    disabled={!onPressCell || cell.black || cell.given}
                                     onPress={() => onPressCell?.(index)}
                                     style={{
                                         width: size,
@@ -143,6 +171,7 @@ export const GridKeyInput = forwardRef<
     return (
         <RNTextInput
             ref={ref}
+            accessibilityLabel="Puzzle grid keyboard"
             value=""
             onChangeText={(text) => [...text].forEach((char) => onChar(char.toUpperCase()))}
             onKeyPress={(event) => {

@@ -12,6 +12,7 @@ import {
     render,
     textContent,
 } from '../../test/render';
+import { GridBoard } from './grid';
 import { PuzzleAnswer } from './PuzzleAnswer';
 import { PuzzleRenderer, type PuzzleInteractionProps } from './PuzzleRenderer';
 
@@ -57,6 +58,29 @@ function renderPuzzle(p: Puzzle) {
     const submit = () => findPressableByText(renderer, 'Submit')!;
     return { renderer, onSubmit, type, backspace, cell, submit };
 }
+
+describe('GridBoard accessibility', () => {
+    it('announces values, clue/code numbers, givens, editability and selection', () => {
+        const view = render(
+            <GridBoard
+                cols={2}
+                onPressCell={vi.fn()}
+                cells={[
+                    { value: '5', given: true },
+                    { value: '', label: 12, selected: true },
+                ]}
+            />
+        );
+        const cells = findAllByHost(view, 'Pressable');
+        expect(cells[0]!.props.accessibilityValue.text).toBe('5, given, not editable');
+        expect(cells[0]!.props.disabled).toBe(true);
+        expect(cells[1]!.props.accessibilityLabel).toBe('Row 1 column 2');
+        expect(cells[1]!.props.accessibilityValue.text).toBe('Empty, number 12, editable');
+        expect(cells[1]!.props.accessibilityRole).toBe('button');
+        expect(cells[1]!.props.accessibilityState).toEqual({ selected: true, disabled: false });
+        act(() => view.unmount());
+    });
+});
 
 describe('CrosswordPuzzleView', () => {
     // CAT
