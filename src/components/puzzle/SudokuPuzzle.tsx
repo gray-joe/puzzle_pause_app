@@ -34,6 +34,8 @@ export function SudokuPuzzleView({ puzzle, onSubmit, ...rest }: Props) {
         inputRef.current?.focus();
     };
 
+    const guess = digits.join('');
+    const errors = rest.gridFeedback?.guess === guess ? rest.gridFeedback.cells : [];
     const canSubmit = digits.every(Boolean);
     const handleSubmit = () => {
         if (!canSubmit) return;
@@ -49,6 +51,11 @@ export function SudokuPuzzleView({ puzzle, onSubmit, ...rest }: Props) {
             canSubmit={canSubmit}
             onSubmit={handleSubmit}
             {...rest}
+            submitError={
+                rest.gridFeedback && rest.gridFeedback.guess !== guess
+                    ? undefined
+                    : rest.submitError
+            }
         >
             <GridBoard
                 cols={9}
@@ -58,6 +65,10 @@ export function SudokuPuzzleView({ puzzle, onSubmit, ...rest }: Props) {
                     value,
                     given: isGiven(i),
                     selected: i === selected,
+                    highlighted:
+                        selected >= 0 &&
+                        (Math.floor(i / 9) === Math.floor(selected / 9) || i % 9 === selected % 9),
+                    error: errors.includes(i),
                 }))}
             />
             <GridKeyInput

@@ -90,6 +90,31 @@ describe('provider response compatibility', () => {
         });
         expect(typeof parsed.question).toBe('string');
     });
+    it.each([[0, 3, 6], [], undefined])(
+        'retains optional submission cell feedback %j',
+        (error_cells) => {
+            const parsed = AttemptResponseSchema.parse({
+                correct: false,
+                solved: false,
+                score: null,
+                incorrect_guesses: 1,
+                error_cells,
+            });
+            expect(parsed.error_cells).toEqual(error_cells);
+            expect(parsed.answer).toBeUndefined();
+        }
+    );
+    it.each([null, [-1], [1.5], ['0']])('rejects invalid submission feedback %j', (error_cells) => {
+        expect(
+            AttemptResponseSchema.safeParse({
+                correct: false,
+                solved: false,
+                score: null,
+                incorrect_guesses: 1,
+                error_cells,
+            }).success
+        ).toBe(false);
+    });
     it('retains length penalty metadata', () => {
         expect(
             AttemptResponseSchema.parse({

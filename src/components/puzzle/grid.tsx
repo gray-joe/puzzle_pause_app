@@ -17,6 +17,7 @@ export type GridCell = {
     given?: boolean;
     selected?: boolean;
     highlighted?: boolean;
+    error?: boolean;
 };
 
 const MAX_CELL = 44;
@@ -65,9 +66,13 @@ export function GridBoard({
                                 ? scheme === 'dark'
                                     ? '#000000'
                                     : colors.text
-                                : cell.highlighted
-                                  ? `${colors.primary}33`
-                                  : colors.surface;
+                                : cell.error
+                                  ? `${colors.error}33`
+                                  : cell.selected
+                                    ? `${colors.primary}66`
+                                    : cell.highlighted
+                                      ? `${colors.primary}33`
+                                      : colors.surface;
                             return (
                                 <Pressable
                                     key={c}
@@ -85,6 +90,7 @@ export function GridBoard({
                                             : {
                                                   text: [
                                                       cell.value || 'Empty',
+                                                      cell.error ? 'Submitted error' : '',
                                                       cell.label != null
                                                           ? `number ${cell.label}`
                                                           : '',
@@ -117,7 +123,11 @@ export function GridBoard({
                                         justifyContent: 'center',
                                         borderRadius: 3,
                                         borderWidth: cell.selected ? 2 : cell.black ? 0 : 1,
-                                        borderColor: cell.selected ? colors.primary : colors.border,
+                                        borderColor: cell.selected
+                                            ? colors.primary
+                                            : cell.error
+                                              ? colors.error
+                                              : colors.border,
                                         backgroundColor: background,
                                     }}
                                 >

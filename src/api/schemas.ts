@@ -536,6 +536,7 @@ export type TextPuzzle = WordPuzzle | MathPuzzle | LadderPuzzle;
 // POST /puzzle/attempt response
 export const AttemptResponseSchema = z.object({
     correct: z.boolean(),
+    error_cells: z.array(z.number().int().nonnegative()).optional(),
     length_penalty_applied: z.boolean().optional(),
     score: z.number().nullable(),
     incorrect_guesses: z.number(),

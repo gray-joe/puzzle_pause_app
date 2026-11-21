@@ -67,6 +67,8 @@ export function CrosswordPuzzleView({ puzzle, onSubmit, ...rest }: Props) {
         }
     };
 
+    const guess = letters.map((letter, i) => (grid.black[i] ? '#' : letter)).join('');
+    const errors = rest.gridFeedback?.guess === guess ? rest.gridFeedback.cells : [];
     const canSubmit = grid.black.every((isBlack, i) => isBlack || !!letters[i]);
     const handleSubmit = () => {
         if (!canSubmit) return;
@@ -82,6 +84,11 @@ export function CrosswordPuzzleView({ puzzle, onSubmit, ...rest }: Props) {
             canSubmit={canSubmit}
             onSubmit={handleSubmit}
             {...rest}
+            submitError={
+                rest.gridFeedback && rest.gridFeedback.guess !== guess
+                    ? undefined
+                    : rest.submitError
+            }
         >
             <Text
                 style={[
@@ -108,6 +115,7 @@ export function CrosswordPuzzleView({ puzzle, onSubmit, ...rest }: Props) {
                     label: grid.numbers[i],
                     selected: i === selected,
                     highlighted: word.includes(i),
+                    error: errors.includes(i),
                 }))}
             />
             <GridKeyInput

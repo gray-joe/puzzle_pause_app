@@ -74,6 +74,32 @@ function mount(scope: 'today' | 'archive') {
 }
 
 describe.each(['today', 'archive'] as const)('%s shared gameplay lifecycle', (scope) => {
+    it.each([false, true])(
+        'forwards submission feedback for guest=%s and resets across identities',
+        async (guest) => {
+            const view = mount(scope);
+            const grid = {
+                ...puzzle,
+                puzzle_type: 'sudoku',
+                question: { prompt: '', grid: '0'.repeat(81) },
+            } as Puzzle;
+            view.change({
+                puzzle: grid,
+                token: guest ? null : 'token',
+                owner: guest ? 'guest' : 'user:42',
+            });
+            api[scope].attempt.mockResolvedValueOnce({ ...response, error_cells: [0, 8] });
+            await step(() => view.game().interactionProps.onSubmit('1'.repeat(81)));
+            expect(view.game().interactionProps.gridFeedback).toEqual({
+                guess: '1'.repeat(81),
+                cells: [0, 8],
+            });
+            expect(view.game().interactionProps.submitError).toContain('Highlighted squares');
+            view.change({ puzzle: { ...grid, id: 12 } });
+            expect(view.game().interactionProps.gridFeedback).toBeUndefined();
+        }
+    );
+
     it('restores progress, counts hints and mistakes, and keeps give-up timing', async () => {
         const calls = api[scope];
         calls.hint.mockResolvedValueOnce({ hint: 'Second hint' });

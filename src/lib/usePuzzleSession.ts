@@ -49,6 +49,7 @@ export function usePuzzleSession({
     const [incorrectGuesses, setIncorrectGuesses] = useState<number | null>(null);
     const [openedAt, setOpenedAt] = useState<string | null>(null);
     const [submitError, setSubmitError] = useState('');
+    const [gridFeedback, setGridFeedback] = useState<PuzzleInteractionProps['gridFeedback']>();
     const [hintError, setHintError] = useState('');
     const completed = !!(puzzle?.solved || puzzle?.attempt?.solved || puzzle?.attempt?.gave_up);
     const currentIncorrectGuesses = incorrectGuesses ?? puzzle?.attempt?.incorrect_guesses ?? 0;
@@ -90,6 +91,7 @@ export function usePuzzleSession({
             setHintBaseline(0);
         }
         setLocalResult(null);
+        setGridFeedback(undefined);
         setIncorrectGuesses(null);
         setOpenedAt(null);
         setSubmitError('');
@@ -141,7 +143,17 @@ export function usePuzzleSession({
             pending.current = false;
             recordAttempt(data);
             if (data.gave_up || data.solved || data.correct) terminalResult(data, request);
-            else setSubmitError('Not quite — try again!');
+            else {
+                const cells = data.error_cells ?? [];
+                setGridFeedback({ guess: request.guess!, cells });
+                setSubmitError(
+                    cells.length
+                        ? request.puzzle.puzzle_type === 'codeword'
+                            ? 'Highlighted words or code assignments need another look.'
+                            : 'Highlighted squares need another look.'
+                        : 'Not quite — try again!'
+                );
+            }
         },
         onError: (error, request) => {
             if (!isCurrent(request)) return;
@@ -217,7 +229,10 @@ export function usePuzzleSession({
     const interactionProps: PuzzleInteractionProps = {
         onSubmit: (guess) => {
             const request = startRequest(guess);
-            if (request) attemptMutation.mutate(request);
+            if (request) {
+                setGridFeedback(undefined);
+                attemptMutation.mutate(request);
+            }
         },
         onHint: () => {
             const request = startRequest();
@@ -234,6 +249,7 @@ export function usePuzzleSession({
         isHinting: isPuzzleRequestPending,
         isGivingUp: giveUpMutation.isPending,
         submitError,
+        gridFeedback,
         hintError,
         hintsRevealed: hints,
         canHint: !!puzzle && totalHintsUsed < puzzle.total_hints,

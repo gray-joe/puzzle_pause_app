@@ -81,6 +81,11 @@ export function CodewordPuzzleView({ puzzle, onSubmit, ...rest }: Props) {
         setLetters(({ [selectedCode]: _removed, ...remaining }) => remaining);
     };
 
+    const guess = codes.map((code) => (code === 0 ? '#' : (letters[code] ?? ''))).join('');
+    const errors = rest.gridFeedback?.guess === guess ? rest.gridFeedback.cells : [];
+    const unused = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+        .split('')
+        .filter((ch) => !Object.values(letters).includes(ch));
     const canSubmit = codes.every((code) => code === 0 || !!letters[code]);
     const handleSubmit = () => {
         if (!canSubmit) return;
@@ -96,6 +101,11 @@ export function CodewordPuzzleView({ puzzle, onSubmit, ...rest }: Props) {
             canSubmit={canSubmit}
             onSubmit={handleSubmit}
             {...rest}
+            submitError={
+                rest.gridFeedback && rest.gridFeedback.guess !== guess
+                    ? undefined
+                    : rest.submitError
+            }
         >
             <GridBoard
                 cols={cols}
@@ -107,6 +117,7 @@ export function CodewordPuzzleView({ puzzle, onSubmit, ...rest }: Props) {
                     given: isGiven(code),
                     selected: i === selected,
                     highlighted: code === selectedCode,
+                    error: errors.includes(i),
                 }))}
             />
             <GridKeyInput
@@ -115,6 +126,9 @@ export function CodewordPuzzleView({ puzzle, onSubmit, ...rest }: Props) {
                 onBackspace={onBackspace}
                 editable={!rest.isSubmitting}
             />
+            <Text style={[typography.caption, { color: colors.text }]}>
+                Unused letters: {unused.join(' ') || 'None'}
+            </Text>
             {!!message && (
                 <Text style={[typography.caption, { color: colors.error, textAlign: 'center' }]}>
                     {message}

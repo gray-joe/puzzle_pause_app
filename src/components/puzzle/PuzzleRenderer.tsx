@@ -60,6 +60,7 @@ export type PuzzleInteractionProps = {
     isHinting: boolean;
     isGivingUp: boolean;
     submitError?: string;
+    gridFeedback?: { guess: string; cells: number[] };
     hintError?: string;
     hintsRevealed: string[];
     canHint: boolean;

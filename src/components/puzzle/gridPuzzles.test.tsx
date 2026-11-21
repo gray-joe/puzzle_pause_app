@@ -42,10 +42,15 @@ function puzzle(puzzle_type: string, question: unknown): Puzzle {
     });
 }
 
-function renderPuzzle(p: Puzzle) {
+function renderPuzzle(p: Puzzle, feedback?: PuzzleInteractionProps['gridFeedback']) {
     const onSubmit = vi.fn();
     const renderer = render(
-        <PuzzleRenderer {...interactionProps} puzzle={p} onSubmit={onSubmit} />
+        <PuzzleRenderer
+            {...interactionProps}
+            gridFeedback={feedback}
+            puzzle={p}
+            onSubmit={onSubmit}
+        />
     );
     const keys = () => findByHost(renderer, 'TextInput');
     const type = (text: string) => [...text].forEach((char) => changeText(keys(), char));
@@ -277,11 +282,86 @@ describe('CodewordPuzzleView', () => {
 
         type('a');
         expect(allText(renderer)).toContain('A is already used for 1');
+        expect(allText(renderer)).toContain('Unused letters: B C D');
         type('b'); // code 2, then jumps to code 3
+        expect(allText(renderer)).toContain('Unused letters: C D');
         type('c');
         press(submit());
 
         expect(onSubmit).toHaveBeenCalledWith('ABCB#ACAB');
+    });
+});
+
+describe('grid UX feedback', () => {
+    it.each([
+        ['sudoku', { prompt: '', grid: '0' + '1'.repeat(80) }, '2' + '1'.repeat(80), '2'],
+        [
+            'crossword',
+            { prompt: '', layout: ['...', '.#.', '...'], clues: { across: {}, down: {} } },
+            'AAAA#AAAA',
+            'A',
+        ],
+        [
+            'codeword',
+            {
+                prompt: '',
+                cells: [
+                    [1, 2, 3],
+                    [2, 0, 1],
+                    [3, 1, 2],
+                ],
+                givens: { 2: 'B', 3: 'C' },
+            },
+            'ABCB#ACAB',
+            'A',
+        ],
+    ])(
+        'shows %s server feedback and clears it when entries change',
+        (kind, question, guess, entry) => {
+            const p = puzzle(kind as string, question);
+            const { renderer, cell, type, submit, onSubmit } = renderPuzzle(p);
+            if (kind === 'crossword') {
+                for (let row = 1; row <= 3; row++) {
+                    for (let col = 1; col <= 3; col++) {
+                        if (row === 2 && col === 2) continue;
+                        press(cell(row, col));
+                        type('A');
+                    }
+                }
+            } else type(entry as string);
+            press(submit());
+            expect(onSubmit).toHaveBeenCalledWith(guess);
+            act(() =>
+                renderer.update(
+                    <PuzzleRenderer
+                        {...interactionProps}
+                        puzzle={p}
+                        onSubmit={onSubmit}
+                        gridFeedback={{ guess: guess as string, cells: [0] }}
+                    />
+                )
+            );
+            expect(cell(1, 1).props.accessibilityValue.text).toContain('Submitted error');
+            press(cell(1, 1));
+            type(kind === 'sudoku' ? '3' : 'Z');
+            expect(cell(1, 1).props.accessibilityValue.text).not.toContain('Submitted error');
+        }
+    );
+
+    it('highlights the Sudoku selected row and column, not unrelated squares', () => {
+        const { cell } = renderPuzzle(puzzle('sudoku', { prompt: '', grid: '0'.repeat(81) }));
+        expect(cell(1, 1).props.style.backgroundColor).not.toBe(
+            cell(1, 2).props.style.backgroundColor
+        );
+        expect(cell(1, 2).props.style.backgroundColor).toBe(cell(2, 1).props.style.backgroundColor);
+        expect(cell(1, 2).props.style.backgroundColor).not.toBe(
+            cell(2, 2).props.style.backgroundColor
+        );
+        press(cell(2, 2));
+        expect(cell(2, 2).props.accessibilityState.selected).toBe(true);
+        expect(cell(1, 1).props.style.backgroundColor).not.toBe(
+            cell(1, 2).props.style.backgroundColor
+        );
     });
 });
 
