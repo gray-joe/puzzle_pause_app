@@ -1,5 +1,6 @@
 import * as Sentry from '@sentry/react-native';
 import * as SecureStore from 'expo-secure-store';
+import { Platform } from 'react-native';
 import { createContext, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { logout, me } from '../api/auth';
 import { ApiError, registerUnauthorizedHandler } from '../api/client';
@@ -34,16 +35,20 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
     const signOut = useCallback(async () => {
         const token = tokenRef.current;
+        // Only the server can clear the browser's HttpOnly session cookie.
+        if (Platform.OS === 'web' && token) await logout(token);
         tokenRef.current = null;
         setSession(null);
         queryClient.clear();
-        await SecureStore.deleteItemAsync(JWT_KEY);
-        if (token) logout(token).catch(() => {});
+        if (Platform.OS !== 'web') {
+            await SecureStore.deleteItemAsync(JWT_KEY);
+            if (token) logout(token).catch(() => {});
+        }
     }, []);
 
     useEffect(() => {
         registerUnauthorizedHandler((failedToken) => {
-            if (failedToken === tokenRef.current) void signOut();
+            if (failedToken === tokenRef.current) void signOut().catch(() => {});
         });
         return () => registerUnauthorizedHandler(null);
     }, [signOut]);
@@ -51,13 +56,17 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     useEffect(() => {
         const bootstrap = async () => {
             try {
-                const token = await SecureStore.getItemAsync(JWT_KEY);
+                // Browser auth uses the backend cookie; no token is stored in JavaScript storage.
+                const token =
+                    Platform.OS === 'web'
+                        ? 'cookie-session'
+                        : await SecureStore.getItemAsync(JWT_KEY);
                 if (!token) return;
                 const user = await me(token);
                 tokenRef.current = token;
                 setSession({ token, user });
             } catch (err) {
-                if (err instanceof ApiError && err.status === 401) {
+                if (Platform.OS !== 'web' && err instanceof ApiError && err.status === 401) {
                     await SecureStore.deleteItemAsync(JWT_KEY);
                 }
             } finally {
@@ -68,7 +77,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     }, []);
 
     const signIn = useCallback(async (token: string, user: User) => {
-        await SecureStore.setItemAsync(JWT_KEY, token);
+        if (Platform.OS !== 'web') await SecureStore.setItemAsync(JWT_KEY, token);
         queryClient.clear();
         tokenRef.current = token;
         setSession({ token, user });

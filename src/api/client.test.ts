@@ -76,6 +76,24 @@ describe('apiRequest', () => {
         expect(options.credentials).toBe('omit');
     });
 
+    it('uses the browser cookie instead of bearer headers on web', async () => {
+        const { Platform } = await import('react-native');
+        Platform.OS = 'web';
+        try {
+            const fetchMock = vi.fn().mockResolvedValue(makeResponse(200, { ok: true }));
+            vi.stubGlobal('fetch', fetchMock);
+            const { apiRequest } = await import('./client');
+            await apiRequest('/auth/me', z.unknown(), { token: 'cookie-session' });
+            expect(fetchMock.mock.calls[0]![1]).toMatchObject({
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+            });
+            expect(fetchMock.mock.calls[0]![1].headers.Authorization).toBeUndefined();
+        } finally {
+            Platform.OS = 'ios';
+        }
+    });
+
     it('omits auth and request body when token and body are not provided', async () => {
         const fetchMock = vi.fn().mockResolvedValue(makeResponse(200, { value: 'ok' }));
         vi.stubGlobal('fetch', fetchMock);

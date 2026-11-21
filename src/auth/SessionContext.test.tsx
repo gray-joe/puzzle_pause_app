@@ -1,5 +1,6 @@
 import * as Sentry from '@sentry/react-native';
 import React from 'react';
+import { Platform } from 'react-native';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { act } from 'react-test-renderer';
 import { ApiError, apiRequest } from '../api/client';
@@ -214,6 +215,52 @@ describe('SessionProvider', () => {
         } finally {
             vi.unstubAllGlobals();
             act(() => view.unmount());
+        }
+    });
+
+    it('restores, signs in and signs out with browser cookies without SecureStore', async () => {
+        Platform.OS = 'web';
+        try {
+            mocks.me.mockResolvedValueOnce(user);
+            const view = render(
+                <SessionProvider>
+                    <Consumer />
+                </SessionProvider>
+            );
+            await flushEffects();
+            expect(mocks.me).toHaveBeenCalledWith('cookie-session');
+            expect(allText(view)).toContain('Ready: user@example.com');
+            await pressAsync(findPressableByText(view, 'Sign in')!);
+            await pressAsync(findPressableByText(view, 'Sign out')!);
+            expect(mocks.logout).toHaveBeenCalledExactlyOnceWith('new-token');
+            expect(mocks.getItemAsync).not.toHaveBeenCalled();
+            expect(mocks.setItemAsync).not.toHaveBeenCalled();
+            expect(mocks.deleteItemAsync).not.toHaveBeenCalled();
+            expect(allText(view)).toContain('Ready: none');
+            act(() => view.unmount());
+        } finally {
+            Platform.OS = 'ios';
+        }
+    });
+
+    it('does not pretend to clear the browser cookie when logout fails', async () => {
+        Platform.OS = 'web';
+        try {
+            mocks.me.mockResolvedValueOnce(user);
+            mocks.logout.mockRejectedValueOnce(new TypeError('offline'));
+            const view = render(
+                <SessionProvider>
+                    <Consumer />
+                </SessionProvider>
+            );
+            await flushEffects();
+            await expect(pressAsync(findPressableByText(view, 'Sign out')!)).rejects.toThrow(
+                'offline'
+            );
+            expect(allText(view)).toContain('Ready: user@example.com');
+            act(() => view.unmount());
+        } finally {
+            Platform.OS = 'ios';
         }
     });
 

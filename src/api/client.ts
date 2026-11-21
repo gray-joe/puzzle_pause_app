@@ -1,4 +1,5 @@
 import type { z } from 'zod';
+import { Platform } from 'react-native';
 
 const BASE_URL =
     process.env.EXPO_PUBLIC_API_BASE_URL ??
@@ -63,13 +64,14 @@ export async function apiRequest<T>(
     opts: RequestOptions = {}
 ): Promise<T> {
     const { method = 'GET', body, token, signal } = opts;
-    if (token && isExpiredJwt(token)) {
+    const cookieAuth = Platform.OS === 'web';
+    if (token && !cookieAuth && isExpiredJwt(token)) {
         onUnauthorizedHandler?.(token);
         throw new ApiError(401, 'Your session has expired. Please sign in again.', null);
     }
 
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    if (token) headers['Authorization'] = `Bearer ${token}`;
+    if (token && !cookieAuth) headers['Authorization'] = `Bearer ${token}`;
 
     const controller = new AbortController();
     const abortFromCaller = () => controller.abort();
@@ -82,9 +84,9 @@ export async function apiRequest<T>(
             headers,
             body: body === undefined ? undefined : JSON.stringify(body),
             signal: controller.signal,
-            // Guests need the backend's persistent guest_session cookie. Authenticated
-            // requests omit cookies so a stale web session cannot override the bearer token.
-            credentials: token ? 'omit' : 'include',
+            // Web uses HttpOnly session cookies; native bearer requests exclude stale cookies.
+            // Native guests still need the backend's guest_session cookie.
+            credentials: token && !cookieAuth ? 'omit' : 'include',
         });
 
         const text = await res.text();

@@ -33,6 +33,10 @@ EXPO_PUBLIC_API_BASE_URL=https://puzzlepause.app/api npm start
 
 When running against a local backend, the OTAC (one-time auth code) is printed to the backend's stdout — no email required for dev sign-in.
 
+## Browser preview
+
+`npm run web` uses the backend's HttpOnly session cookie, not SecureStore or browser token storage. For local testing, use `localhost` for both services and include the Expo web origin (normally `http://localhost:8081`) in the backend's `CORS_ORIGINS`. Hosted browser builds need a same-site API and credentialed CORS when origins differ; a localhost preview cannot use production's cross-site session cookie.
+
 ## Sentry
 
 Preview and production EAS builds read Sentry config from EAS environment variables:

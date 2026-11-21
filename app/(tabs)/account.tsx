@@ -22,6 +22,7 @@ export default function AccountScreen() {
     const [refreshing, setRefreshing] = useState(false);
     const [confirmDelete, setConfirmDelete] = useState(false);
     const [deleteError, setDeleteError] = useState('');
+    const [signOutError, setSignOutError] = useState('');
 
     const { data, isLoading, error, refetch } = useQuery({
         queryKey: ['account', token ?? 'guest'],
@@ -90,8 +91,25 @@ export default function AccountScreen() {
                     testID="account-sign-out"
                     title="Sign out"
                     variant="secondary"
-                    onPress={signOut}
+                    onPress={async () => {
+                        setSignOutError('');
+                        try {
+                            await signOut();
+                        } catch {
+                            setSignOutError(
+                                'Could not sign out. Check your connection and try again.'
+                            );
+                        }
+                    }}
                 />
+                {signOutError ? (
+                    <Text
+                        accessibilityRole="alert"
+                        style={[typography.body, { color: colors.error }]}
+                    >
+                        {signOutError}
+                    </Text>
+                ) : null}
 
                 {deleteError ? (
                     <Text style={[typography.body, { color: colors.error, textAlign: 'center' }]}>
