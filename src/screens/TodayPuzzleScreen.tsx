@@ -1,8 +1,7 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { Stack, useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
-import { ApiError } from '../api/client';
 import * as puzzleApi from '../api/puzzle';
 import type { AttemptResponse, Puzzle } from '../api/schemas';
 import { useSession } from '../auth/useSession';
@@ -11,26 +10,16 @@ import { PuzzleRenderer } from '../components/puzzle/PuzzleRenderer';
 import { QueryStateView } from '../components/QueryStateView';
 import { Screen } from '../components/Screen';
 import { Button } from '../components/Button';
-import { getPuzzleHintSession, setPuzzleHintSessionHints } from '../lib/puzzleHintSession';
-import {
-    getGuestPuzzleResult,
-    getGuestPuzzleResultAsync,
-    setGuestPuzzleResult,
-} from '../lib/guestPuzzleState';
 import { formatCompletionStats } from '../lib/puzzleAnswer';
 import { PuzzleAnswer } from '../components/puzzle/PuzzleAnswer';
 import { buildShareText, shareResult } from '../lib/shareResult';
-import { clearPuzzleDraft } from '../lib/puzzleDrafts';
+import { usePuzzleSession } from '../lib/usePuzzleSession';
 import { useTheme } from '../theme';
 
 export function TodayPuzzleScreen() {
     const { session } = useSession();
     const token = session?.token ?? null;
-    const draftOwner = session ? `user:${session.user.id}` : 'guest';
-    const userKey = token ?? 'guest';
-    const queryClient = useQueryClient();
     const { colors } = useTheme();
-
     const {
         data: puzzle,
         isLoading,
@@ -40,21 +29,15 @@ export function TodayPuzzleScreen() {
         queryKey: ['puzzle', 'today', token ?? 'guest'],
         queryFn: () => puzzleApi.today(token),
     });
-
-    const [localResult, setLocalResult] = useState<AttemptResponse | null>(null);
-    const [guestResult, setGuestResult] = useState<AttemptResponse | null>(null);
-    const [sessionHints, setSessionHints] = useState<string[]>([]);
-    const [sessionHintBaseline, setSessionHintBaseline] = useState(0);
-    const [sessionIncorrectGuesses, setSessionIncorrectGuesses] = useState<number | null>(null);
-    const [sessionOpenedAt, setSessionOpenedAt] = useState<string | null>(null);
-    const [submitError, setSubmitError] = useState('');
-    const [hintError, setHintError] = useState('');
+    const game = usePuzzleSession({
+        puzzle,
+        token,
+        owner: session ? `user:${session.user.id}` : 'guest',
+        scope: 'today',
+    });
     const [refreshing, setRefreshing] = useState(false);
-    const giveUpPendingRef = useRef(false);
-
     const alreadySolved = puzzle?.attempt?.solved === true;
     const alreadyGaveUp = puzzle?.attempt?.gave_up === true;
-
     const {
         data: serverResult,
         isError: isResultError,
@@ -62,7 +45,7 @@ export function TodayPuzzleScreen() {
     } = useQuery({
         queryKey: ['puzzle', 'result', token ?? 'guest', puzzle?.id],
         queryFn: () => puzzleApi.result(token),
-        enabled: alreadySolved && !localResult && !!token,
+        enabled: alreadySolved && !game.localResult && !!token,
         select: (data): AttemptResponse => ({
             correct: true,
             solved: true,
@@ -75,15 +58,14 @@ export function TodayPuzzleScreen() {
             completed_at: data.attempt.completed_at,
         }),
     });
-
-    // If the result fetch fails, build a minimal result from the attempt data on the puzzle
-    // so the user isn't shown the puzzle again after already solving it.
+    // Never reopen an already completed puzzle because its result fetch failed.
     const fallbackResult: AttemptResponse | null =
-        alreadySolved && isResultError && puzzle?.attempt
+        ((alreadySolved && isResultError) || alreadyGaveUp) && puzzle?.attempt
             ? {
-                  correct: true,
-                  solved: true,
-                  score: puzzle.attempt.score,
+                  correct: alreadySolved,
+                  solved: alreadySolved,
+                  gave_up: alreadyGaveUp,
+                  score: alreadyGaveUp ? 0 : puzzle.attempt.score,
                   incorrect_guesses: puzzle.attempt.incorrect_guesses,
                   answer: puzzle.answer,
                   explanation: puzzle.explanation,
@@ -91,214 +73,22 @@ export function TodayPuzzleScreen() {
                   completed_at: puzzle.attempt.completed_at,
               }
             : null;
-
-    const initialGiveUpResult: AttemptResponse | null =
-        alreadyGaveUp && puzzle?.attempt
-            ? {
-                  correct: false,
-                  solved: false,
-                  gave_up: true,
-                  score: 0,
-                  incorrect_guesses: puzzle.attempt.incorrect_guesses,
-                  answer: puzzle.answer,
-                  explanation: puzzle.explanation,
-                  opened_at: puzzle.attempt.opened_at,
-                  completed_at: puzzle.attempt.completed_at,
-              }
-            : null;
-
-    const displayResult: AttemptResponse | null =
-        localResult ??
-        initialGiveUpResult ??
+    const displayResult =
+        game.localResult ??
+        (alreadyGaveUp ? fallbackResult : null) ??
         (alreadySolved ? serverResult : null) ??
         fallbackResult ??
-        guestResult;
-    useEffect(() => {
-        if (puzzle && (puzzle.solved || puzzle.attempt?.solved || puzzle.attempt?.gave_up)) {
-            void clearPuzzleDraft(draftOwner, puzzle.id).catch(() => {});
-        }
-    }, [draftOwner, puzzle?.id, puzzle?.solved, puzzle?.attempt?.solved, puzzle?.attempt?.gave_up]);
-
-    const currentIncorrectGuesses =
-        sessionIncorrectGuesses ?? puzzle?.attempt?.incorrect_guesses ?? 0;
-    const currentOpenedAt = sessionOpenedAt ?? puzzle?.attempt?.opened_at ?? null;
-
-    useEffect(() => {
-        let active = true;
-        if (puzzle) {
-            const hasServerCompletion = puzzle.attempt?.solved || puzzle.attempt?.gave_up;
-            const storedGuestResult =
-                token || hasServerCompletion ? null : getGuestPuzzleResult(puzzle.id);
-            setGuestResult(storedGuestResult);
-            if (storedGuestResult) void clearPuzzleDraft('guest', puzzle.id).catch(() => {});
-            if (!token && !hasServerCompletion && !storedGuestResult) {
-                getGuestPuzzleResultAsync(puzzle.id).then((result) => {
-                    if (active && result) {
-                        void clearPuzzleDraft('guest', puzzle.id).catch(() => {});
-                        setGuestResult((current) => current ?? result);
-                    }
-                });
-            }
-            const { hints, baseline } = getPuzzleHintSession(
-                queryClient,
-                'today',
-                userKey,
-                puzzle.id,
-                puzzle.attempt?.hint_used ?? 0,
-                puzzle.revealed_hint
-            );
-            setSessionHints(hints);
-            setSessionHintBaseline(baseline);
-        } else {
-            setGuestResult(null);
-            setSessionHints([]);
-            setSessionHintBaseline(0);
-        }
-
-        setLocalResult(null);
-        setSessionIncorrectGuesses(null);
-        setSessionOpenedAt(null);
-        setSubmitError('');
-        setHintError('');
-        return () => {
-            active = false;
-        };
-    }, [
-        queryClient,
-        token,
-        userKey,
-        puzzle?.id,
-        puzzle?.attempt?.hint_used,
-        puzzle?.revealed_hint,
-        puzzle?.attempt?.solved,
-        puzzle?.attempt?.gave_up,
-    ]);
-
-    const handleTerminalResult = (data: AttemptResponse) => {
-        setLocalResult(data);
-        if (puzzle) void clearPuzzleDraft(draftOwner, puzzle.id).catch(() => {});
-        if (!token && puzzle) {
-            setGuestPuzzleResult(puzzle, data);
-            setGuestResult(data);
-        }
-        setSubmitError('');
-        queryClient.invalidateQueries({
-            queryKey: ['puzzle', 'today', token ?? 'guest'],
-        });
-        queryClient.invalidateQueries({
-            queryKey: ['calendar', 'completed', token ?? 'guest'],
-        });
-
-        if (data.solved || data.correct) {
-            if (!token) {
-                queryClient.invalidateQueries({ queryKey: ['archive', 'list', 'guest'] });
-            } else {
-                queryClient.invalidateQueries({ queryKey: ['account', token] });
-            }
-        }
-    };
-
-    const attemptMutation = useMutation({
-        mutationFn: (guess: string) =>
-            puzzleApi.attempt(
-                token,
-                puzzle!.id,
-                guess,
-                currentOpenedAt,
-                currentIncorrectGuesses,
-                totalHintsUsed
-            ),
-        onSuccess: (data) => {
-            setSessionIncorrectGuesses(data.incorrect_guesses);
-            if (data.opened_at != null) setSessionOpenedAt(data.opened_at);
-            if (data.gave_up || data.solved || data.correct) {
-                handleTerminalResult(data);
-            } else {
-                setSubmitError('Not quite — try again!');
-            }
-        },
-        onError: (err) => {
-            setSubmitError(
-                err instanceof ApiError ? err.message : 'Something went wrong. Try again.'
-            );
-        },
-    });
-
-    const hintMutation = useMutation({
-        mutationFn: () => puzzleApi.hint(token, puzzle!.id, totalHintsUsed),
-        onSuccess: (data) => {
-            setHintError('');
-            setSessionHints((prev) => {
-                const next = [...prev, data.hint];
-                setPuzzleHintSessionHints(queryClient, 'today', userKey, puzzle!.id, next);
-                return next;
-            });
-        },
-        onError: (err) => {
-            setHintError(
-                err instanceof ApiError ? err.message : 'Could not reveal the next hint. Try again.'
-            );
-        },
-    });
-
-    const giveUpMutation = useMutation({
-        mutationFn: () => puzzleApi.giveUp(token, puzzle!.id),
-        onSuccess: (data) => {
-            giveUpPendingRef.current = false;
-            setSessionIncorrectGuesses(data.incorrect_guesses);
-            if (data.opened_at != null) setSessionOpenedAt(data.opened_at);
-            if (data.gave_up || data.solved || data.correct) {
-                handleTerminalResult(data);
-            } else {
-                setSubmitError('Something went wrong. Try again.');
-            }
-        },
-        onError: (err) => {
-            giveUpPendingRef.current = false;
-            setSubmitError(
-                err instanceof ApiError ? err.message : 'Something went wrong. Try again.'
-            );
-        },
-    });
-
-    const totalHintsUsed = Math.max(
-        puzzle?.attempt?.hint_used ?? 0,
-        sessionHintBaseline + sessionHints.length
-    );
-    const canHint = !!puzzle && totalHintsUsed < puzzle.total_hints;
-    const isPuzzleRequestPending =
-        attemptMutation.isPending || hintMutation.isPending || giveUpMutation.isPending;
-
-    const handleSubmit = (guess: string) => {
-        if (displayResult || isPuzzleRequestPending) return;
-        attemptMutation.mutate(guess);
-    };
-
-    const handleHint = () => {
-        if (displayResult || isPuzzleRequestPending) return;
-        hintMutation.mutate();
-    };
-
-    const handleGiveUp = () => {
-        if (displayResult || isPuzzleRequestPending || giveUpPendingRef.current) return;
-        giveUpPendingRef.current = true;
-        setSubmitError('');
-        giveUpMutation.mutate();
-    };
-
-    // Keep showing a spinner until we have something to display for a solved puzzle —
-    // avoids the puzzle flashing through while GET /puzzle/result is in-flight.
+        game.guestResult;
     const isPageLoading = isLoading || (alreadySolved && !displayResult);
-
     const handleRefresh = async () => {
         setRefreshing(true);
-        await refetch();
-        if (alreadySolved && token) {
-            await refetchResult();
+        try {
+            await refetch();
+            if (alreadySolved && token) await refetchResult();
+        } finally {
+            setRefreshing(false);
         }
-        setRefreshing(false);
     };
-
     return (
         <>
             <Stack.Screen
@@ -324,36 +114,12 @@ export function TodayPuzzleScreen() {
                             <ResultView puzzle={puzzle} result={displayResult} />
                         ) : (
                             <PuzzleRenderer
-                                draftOwner={draftOwner}
-                                draftToken={token}
-                                progressMetadata={{
-                                    opened_at: currentOpenedAt,
-                                    incorrect_guesses: currentIncorrectGuesses,
-                                    hint_used: totalHintsUsed,
-                                    hints: sessionHints,
-                                }}
-                                onRestoreProgress={(saved) => {
-                                    setSessionOpenedAt(saved.opened_at);
-                                    setSessionIncorrectGuesses(saved.incorrect_guesses);
-                                    setSessionHints(saved.hints);
-                                    setSessionHintBaseline(
-                                        Math.max(0, saved.hint_used - saved.hints.length)
-                                    );
-                                }}
+                                puzzle={puzzle}
+                                {...game.interactionProps}
+                                {...game.progressProps}
                                 onReloadProgress={() => {
                                     void refetch();
                                 }}
-                                puzzle={puzzle}
-                                onSubmit={handleSubmit}
-                                onHint={handleHint}
-                                hintError={hintError}
-                                onGiveUp={handleGiveUp}
-                                isSubmitting={isPuzzleRequestPending}
-                                isHinting={isPuzzleRequestPending}
-                                isGivingUp={giveUpMutation.isPending}
-                                submitError={submitError}
-                                hintsRevealed={sessionHints}
-                                canHint={canHint}
                             />
                         ))}
                 </QueryStateView>
@@ -362,10 +128,7 @@ export function TodayPuzzleScreen() {
     );
 }
 
-type ResultViewProps = {
-    puzzle: Puzzle;
-    result: AttemptResponse;
-};
+type ResultViewProps = { puzzle: Puzzle; result: AttemptResponse };
 
 function ResultView({ puzzle, result }: ResultViewProps) {
     const { session } = useSession();
@@ -373,18 +136,15 @@ function ResultView({ puzzle, result }: ResultViewProps) {
     const { colors, spacing, typography } = useTheme();
     const [didCopy, setDidCopy] = useState(false);
     const completionStats = formatCompletionStats(puzzle.completion_stats);
-
     useEffect(() => {
         if (!didCopy) return;
         const timeout = setTimeout(() => setDidCopy(false), 2000);
         return () => clearTimeout(timeout);
     }, [didCopy]);
-
     const handleShare = () => {
         shareResult(buildShareText(puzzle, result, 'today'));
         setDidCopy(true);
     };
-
     return (
         <View style={{ flex: 1, justifyContent: 'center', gap: spacing.lg }}>
             <View style={{ gap: spacing.xs }}>
@@ -400,22 +160,18 @@ function ResultView({ puzzle, result }: ResultViewProps) {
                     {result.gave_up ? 'Gave up' : 'Solved!'}
                 </Text>
             </View>
-
             {!result.gave_up && result.score != null && (
                 <View style={{ gap: spacing.xs }}>
                     <Text style={[typography.caption, { color: colors.textMuted }]}>Score</Text>
                     <Text style={[typography.title, { color: colors.text }]}>{result.score}</Text>
                 </View>
             )}
-
             <Button
                 title={didCopy ? 'Copied!' : 'Share result'}
                 variant="secondary"
                 onPress={handleShare}
             />
-
             <PuzzleCompletionStats stats={completionStats} />
-
             {!result.gave_up && result.streak != null && result.streak > 0 && (
                 <View style={{ gap: spacing.xs }}>
                     <Text style={[typography.caption, { color: colors.textMuted }]}>Streak</Text>
@@ -424,7 +180,6 @@ function ResultView({ puzzle, result }: ResultViewProps) {
                     </Text>
                 </View>
             )}
-
             {result.answer != null && (
                 <View style={{ gap: spacing.xs }}>
                     <Text style={[typography.caption, { color: colors.textMuted }]}>Answer</Text>
@@ -435,7 +190,6 @@ function ResultView({ puzzle, result }: ResultViewProps) {
                     />
                 </View>
             )}
-
             {result.explanation && (
                 <View testID="result-explanation" style={{ gap: spacing.xs }}>
                     <Text style={[typography.caption, { color: colors.textMuted }]}>
@@ -446,7 +200,6 @@ function ResultView({ puzzle, result }: ResultViewProps) {
                     </Text>
                 </View>
             )}
-
             {!session && (
                 <Pressable onPress={() => router.push('/(auth)/email' as never)}>
                     <Text style={[typography.body, { color: colors.primary }]}>

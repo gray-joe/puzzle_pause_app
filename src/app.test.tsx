@@ -194,7 +194,7 @@ function installMutationMock() {
                 const result = options.mutationFn(arg);
                 options.onSuccess?.(result, arg);
             } catch (err) {
-                options.onError?.(err);
+                options.onError?.(err, arg);
             }
         },
     }));
