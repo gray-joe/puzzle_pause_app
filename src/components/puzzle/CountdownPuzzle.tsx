@@ -178,7 +178,7 @@ export function CountdownPuzzleView({
                 </View>
                 {!showTotal && (
                     <Button
-                        title="Show total (-10 pts)"
+                        title="Show total"
                         variant="secondary"
                         onPress={() => setShowTotal(true)}
                         disabled={total == null}

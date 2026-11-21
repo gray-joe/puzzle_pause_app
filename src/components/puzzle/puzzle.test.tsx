@@ -573,6 +573,8 @@ describe('CountdownPuzzleView', () => {
         press(findPressableByText(renderer, '75')!);
         press(findPressableByText(renderer, '+')!);
         press(findPressableByText(renderer, '50')!);
+        expect(textContent(findPressableByText(renderer, 'Show total')!)).toBe('Show total');
+        expect(allText(renderer)).not.toContain('-10 pts');
         press(findPressableByText(renderer, 'Show total')!);
 
         expect(allText(renderer)).toContain('75 + 50');
