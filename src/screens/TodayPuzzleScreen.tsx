@@ -60,7 +60,7 @@ export function TodayPuzzleScreen() {
         isError: isResultError,
         refetch: refetchResult,
     } = useQuery({
-        queryKey: ['puzzle', 'result', token ?? 'guest'],
+        queryKey: ['puzzle', 'result', token ?? 'guest', puzzle?.id],
         queryFn: () => puzzleApi.result(token),
         enabled: alreadySolved && !localResult && !!token,
         select: (data): AttemptResponse => ({
@@ -108,7 +108,11 @@ export function TodayPuzzleScreen() {
             : null;
 
     const displayResult: AttemptResponse | null =
-        localResult ?? initialGiveUpResult ?? serverResult ?? fallbackResult ?? guestResult;
+        localResult ??
+        initialGiveUpResult ??
+        (alreadySolved ? serverResult : null) ??
+        fallbackResult ??
+        guestResult;
     useEffect(() => {
         if (puzzle && (puzzle.solved || puzzle.attempt?.solved || puzzle.attempt?.gave_up)) {
             void clearPuzzleDraft(draftOwner, puzzle.id).catch(() => {});

@@ -615,6 +615,36 @@ describe.each(['today', 'archive'] as const)('%s clue reveal', (scope) => {
 });
 
 describe('today puzzle route', () => {
+    it('does not use yesterday’s cached result for a new unsolved puzzle', async () => {
+        let current = { ...wordPuzzle, attempt: { ...wordPuzzle.attempt, solved: true } };
+        const yesterday = {
+            correct: true,
+            solved: true,
+            score: 90,
+            incorrect_guesses: 0,
+            answer: 'YESTERDAY',
+        };
+        mocks.useQuery.mockImplementation((options) => ({
+            data: options.queryKey[1] === 'today' ? current : yesterday,
+            isLoading: false,
+            error: null,
+            refetch: mocks.refetch,
+        }));
+        const { TodayPuzzleScreen } = await import('./screens/TodayPuzzleScreen');
+        const view = render(<TodayPuzzleScreen />);
+        expect(allText(view)).toContain('YESTERDAY');
+        current = { ...wordPuzzle, id: 99, attempt: { ...wordPuzzle.attempt, solved: false } };
+        update(view, <TodayPuzzleScreen />);
+        expect(allText(view)).not.toContain('YESTERDAY');
+        expect(findPressableByText(view, 'Submit')).toBeDefined();
+        expect(mocks.useQuery).toHaveBeenLastCalledWith(
+            expect.objectContaining({
+                queryKey: ['puzzle', 'result', 'jwt-token', 99],
+                enabled: false,
+            })
+        );
+        act(() => view.unmount());
+    });
     it('renders today puzzle and handles incorrect attempts and hints', async () => {
         mocks.useQuery.mockImplementation((options) => {
             if (options.queryKey[1] === 'today') {
