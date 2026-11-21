@@ -32,6 +32,7 @@ beforeEach(() => {
 
 afterEach(() => {
     vi.unstubAllGlobals();
+    vi.useRealTimers();
 });
 
 describe('apiRequest', () => {
@@ -104,8 +105,35 @@ describe('apiRequest', () => {
         const [, options] = fetchMock.mock.calls[0] as [string, RequestInit];
         expect(options.method).toBe('PATCH');
         expect(options.body).toBe(JSON.stringify({ display_name: 'Puzzle Friend' }));
-        expect(options.signal).toBe(controller.signal);
+        expect(options.signal).toBeInstanceOf(AbortSignal);
+        expect(options.signal?.aborted).toBe(false);
     });
+
+    it.each(['timeout', 'caller'] as const)(
+        'aborts stalled requests on %s and releases its timer',
+        async (cause) => {
+            vi.useFakeTimers();
+            const caller = new AbortController();
+            vi.stubGlobal(
+                'fetch',
+                vi.fn(
+                    (_url: string, options: RequestInit) =>
+                        new Promise((_resolve, reject) => {
+                            options.signal!.addEventListener('abort', () =>
+                                reject(new Error('aborted'))
+                            );
+                        })
+                )
+            );
+            const { apiRequest } = await import('./client');
+            const request = apiRequest('/auth/me', z.unknown(), { signal: caller.signal });
+            const rejected = expect(request).rejects.toThrow('aborted');
+            if (cause === 'caller') caller.abort();
+            else await vi.advanceTimersByTimeAsync(10_000);
+            await rejected;
+            expect(vi.getTimerCount()).toBe(0);
+        }
+    );
 
     it('parses empty successful responses as null', async () => {
         const fetchMock = vi.fn().mockResolvedValue(makeTextResponse(204, ''));

@@ -71,38 +71,48 @@ export async function apiRequest<T>(
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (token) headers['Authorization'] = `Bearer ${token}`;
 
-    const res = await fetch(`${BASE_URL}${path}`, {
-        method,
-        headers,
-        body: body === undefined ? undefined : JSON.stringify(body),
-        signal,
-        // Guests need the backend's persistent guest_session cookie. Authenticated
-        // requests omit cookies so a stale web session cannot override the bearer token.
-        credentials: token ? 'omit' : 'include',
-    });
+    const controller = new AbortController();
+    const abortFromCaller = () => controller.abort();
+    if (signal?.aborted) controller.abort();
+    else signal?.addEventListener('abort', abortFromCaller, { once: true });
+    const timer = setTimeout(() => controller.abort(), 10_000);
+    try {
+        const res = await fetch(`${BASE_URL}${path}`, {
+            method,
+            headers,
+            body: body === undefined ? undefined : JSON.stringify(body),
+            signal: controller.signal,
+            // Guests need the backend's persistent guest_session cookie. Authenticated
+            // requests omit cookies so a stale web session cannot override the bearer token.
+            credentials: token ? 'omit' : 'include',
+        });
 
-    const text = await res.text();
-    let parsed: unknown = null;
-    if (text) {
-        try {
-            parsed = JSON.parse(text);
-        } catch {
-            parsed = text;
+        const text = await res.text();
+        let parsed: unknown = null;
+        if (text) {
+            try {
+                parsed = JSON.parse(text);
+            } catch {
+                parsed = text;
+            }
         }
-    }
 
-    if (!res.ok) {
-        const detail = extractDetail(parsed);
-        const error = new ApiError(
-            res.status,
-            detail ?? `Request failed with status ${res.status}`,
-            parsed
-        );
-        if (res.status === 401 && token) onUnauthorizedHandler?.(token);
-        throw error;
-    }
+        if (!res.ok) {
+            const detail = extractDetail(parsed);
+            const error = new ApiError(
+                res.status,
+                detail ?? `Request failed with status ${res.status}`,
+                parsed
+            );
+            if (res.status === 401 && token) onUnauthorizedHandler?.(token);
+            throw error;
+        }
 
-    return schema.parse(parsed);
+        return schema.parse(parsed);
+    } finally {
+        clearTimeout(timer);
+        signal?.removeEventListener('abort', abortFromCaller);
+    }
 }
 
 export const apiBaseUrl = BASE_URL;

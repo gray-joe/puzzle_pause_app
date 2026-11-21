@@ -19,18 +19,11 @@ export const PuzzleProgressSchema = z.object({
 export type PuzzleProgress = z.infer<typeof PuzzleProgressSchema>;
 
 async function request(token: string, id: number, body?: unknown) {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 10000);
-    try {
-        return await apiRequest(`/puzzle/${id}/progress`, PuzzleProgressSchema, {
-            method: body === undefined ? 'GET' : 'PUT',
-            token,
-            body,
-            signal: controller.signal,
-        });
-    } finally {
-        clearTimeout(timer);
-    }
+    return apiRequest(`/puzzle/${id}/progress`, PuzzleProgressSchema, {
+        method: body === undefined ? 'GET' : 'PUT',
+        token,
+        body,
+    });
 }
 
 // Authenticated only. Never use attempt endpoints for partial grid saves.
