@@ -151,7 +151,7 @@ Behavioral notes:
 | `choice` | `"prompt\|optA\|optB\|optC\|optD"` (pipe-delimited) | letter code: `"A"`/`"B"`/`"C"`/`"D"` |
 | `image-word` | JSON `{ prompt, image_url }` | free text |
 | `clue-reveal` | JSON `{ prompt, clues: string[] }` | free text (see hint quirk below) |
-| `countdown` | JSON `{ prompt, target, numbers: number[], operators: string[] }` | numeric result as text, e.g. `"473"`, not the arithmetic expression; see `formatCountdownResult` |
+| `countdown` | JSON `{ prompt, target, numbers: number[], operators: string[] }` | JSON-encoded array of selected tile strings, e.g. `'["6","×","(","50","+","1",")"]'`; never just the calculated total |
 | `order` | JSON `{ prompt, items: string[] }` | comma-separated original indices reflecting user's reorder, e.g. `"2,0,1,3"` |
 | `word-wheel` | JSON `{ prompt, wheels: { letters: (string\|null)[] }[] }` | space-separated found words |
 | `scrabble` | JSON `{ prompt, board: (string\|null)[], modifiers: (string\|null)[], rack: string[] }` | trimmed `"word score"` string, e.g. `"mask 10"` |
@@ -168,6 +168,14 @@ Behavioral notes:
 | `canvas` | JSON `{ prompt, background?: string, alt?: string, shapes: Shape[] }` — a drawing in a fixed 800 × 600 coordinate space, see quirks below | free text |
 | `image-tap` (backend/web only) | JSON `{ prompt, image_url }` | normalized coordinate string `"x,y"`, e.g. `"0.52,0.38"`; not implemented on mobile |
 | `image-order` (backend/web only) | JSON `{ prompt, images: string[] }` | comma-separated original image indices in the chosen order, e.g. `"2,0,1"`; not implemented on mobile |
+
+### Countdown submissions and running total
+
+Daily and archive play submit the expression as a JSON string array of number/operator/parenthesis tiles. The backend checks the supplied numbers (including duplicate counts), allowed operators and exact arithmetic; a bare target such as `"306"` is rejected. `formatCountdownResult` is for displaying totals only, not request encoding.
+
+**Show total (-10 pts)** and **Hint** use the same hint endpoint and unlock the same running total. Totals remain hidden until a hint request succeeds; failed/offline requests do not unlock them. Once purchased, the total remains available through edits, backspace and Clear. Restored `revealed_hint` also restores the total without a second purchase. Countdown always exposes at least one hint (`"Running total enabled"` when no authored hint exists). Guest attempts carry the local `hints_used` penalty; authenticated attempts use the server's persisted hint count.
+
+The mobile fix uses the existing backend/web contract; no new endpoint, response field or database migration is required. Older mobile builds submitting numeric totals remain incompatible and need a client update; do not relax backend expression validation to accommodate them.
 
 ### Ladder blank count
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PuzzleSchema, AttemptResponseSchema } from './schemas';
+import { PuzzleSchema, AttemptResponseSchema, HintResponseSchema } from './schemas';
 
 const base = {
     id: 1,
@@ -59,6 +59,33 @@ describe.each(['crossword', 'codeword'])('%s provider grid bounds', (type) => {
             PuzzleSchema.safeParse({ ...payload, question: JSON.stringify(question) }).success
         ).toBe(false);
     });
+});
+
+describe('Countdown provider contract', () => {
+    it.each([undefined, 'Running total enabled'])(
+        'accepts a total-only hint and restored purchase %s',
+        (revealed_hint) => {
+            const puzzle = PuzzleSchema.parse({
+                ...base,
+                puzzle_type: 'countdown',
+                question: JSON.stringify({
+                    prompt: 'Reach the target',
+                    target: 306,
+                    numbers: [75, 50, 6, 3, 2, 1],
+                    operators: ['+', '-', '×', '÷'],
+                }),
+                hint: null,
+                has_hint: true,
+                total_hints: 1,
+                revealed_hint,
+            });
+            expect(puzzle.total_hints).toBe(1);
+            expect(puzzle.revealed_hint).toBe(revealed_hint);
+            expect(
+                HintResponseSchema.parse({ hint: 'Running total enabled', total_hints: 1 }).hint
+            ).toBe('Running total enabled');
+        }
+    );
 });
 
 describe('provider response compatibility', () => {

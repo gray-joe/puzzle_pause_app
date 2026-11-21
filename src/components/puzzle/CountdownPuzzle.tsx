@@ -24,7 +24,7 @@ export function CountdownPuzzleView({
     canHint,
 }: Props) {
     const [tokens, setTokens] = useState<CountdownToken[]>([]);
-    const [showTotal, setShowTotal] = useState(false);
+    const showTotal = hintsRevealed.length > 0;
     const { colors, spacing, typography } = useTheme();
     const puzzleTextStyle = { fontSize: 21, lineHeight: 30 };
     const total = evaluateCountdownTokens(tokens);
@@ -35,21 +35,18 @@ export function CountdownPuzzleView({
 
     const appendToken = (token: CountdownToken) => {
         setTokens((prev) => [...prev, token]);
-        setShowTotal(false);
     };
 
     const handleBackspace = () => {
         setTokens((prev) => prev.slice(0, -1));
-        setShowTotal(false);
     };
 
     const handleClear = () => {
         setTokens([]);
-        setShowTotal(false);
     };
 
     const handleSubmit = () => {
-        if (total != null) onSubmit(formatCountdownResult(total));
+        if (total != null) onSubmit(JSON.stringify(tokens.map(countdownTokenLabel)));
     };
 
     return (
@@ -176,12 +173,13 @@ export function CountdownPuzzleView({
                         />
                     </View>
                 </View>
-                {!showTotal && (
+                {!showTotal && canHint && (
                     <Button
-                        title="Show total"
+                        title="Show total (-10 pts)"
                         variant="secondary"
-                        onPress={() => setShowTotal(true)}
-                        disabled={total == null}
+                        onPress={onHint}
+                        loading={isHinting}
+                        disabled={isSubmitting}
                     />
                 )}
                 <Button

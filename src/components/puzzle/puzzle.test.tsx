@@ -556,7 +556,7 @@ describe('ImageWordPuzzleView', () => {
 });
 
 describe('CountdownPuzzleView', () => {
-    it('builds expressions, shows totals, and submits evaluated results', () => {
+    it('builds expressions and submits the selected tiles without revealing the total', () => {
         const onSubmit = vi.fn();
         const renderer = render(
             <CountdownPuzzleView
@@ -573,16 +573,74 @@ describe('CountdownPuzzleView', () => {
         press(findPressableByText(renderer, '75')!);
         press(findPressableByText(renderer, '+')!);
         press(findPressableByText(renderer, '50')!);
-        expect(textContent(findPressableByText(renderer, 'Show total')!)).toBe('Show total');
-        expect(allText(renderer)).not.toContain('-10 pts');
-        press(findPressableByText(renderer, 'Show total')!);
-
+        expect(findPressableByText(renderer, 'Show total (-10 pts)')).toBeDefined();
         expect(allText(renderer)).toContain('75 + 50');
-        expect(allText(renderer)).toContain('Total: 125');
+        expect(allText(renderer)).not.toContain('Total:');
 
         press(findPressableByText(renderer, 'Submit')!);
 
-        expect(onSubmit).toHaveBeenCalledWith('125');
+        expect(onSubmit).toHaveBeenCalledWith(JSON.stringify(['75', '+', '50']));
+    });
+
+    it('requests the paid hint but does not unlock the total before confirmation', () => {
+        const onHint = vi.fn();
+        const renderer = render(
+            <CountdownPuzzleView {...interactionProps} puzzle={countdownPuzzle()} onHint={onHint} />
+        );
+        press(findPressableByText(renderer, '75')!);
+        press(findPressableByText(renderer, 'Show total (-10 pts)')!);
+        expect(onHint).toHaveBeenCalledOnce();
+        expect(allText(renderer)).not.toContain('Total:');
+    });
+
+    it('restores a purchased total and keeps it unlocked through editing and clearing', () => {
+        const onHint = vi.fn();
+        const renderer = render(
+            <CountdownPuzzleView
+                {...interactionProps}
+                puzzle={countdownPuzzle()}
+                onHint={onHint}
+                hintsRevealed={['Running total enabled']}
+                canHint={false}
+            />
+        );
+        press(findPressableByText(renderer, '75')!);
+        expect(allText(renderer)).toContain('Total: 75');
+        press(findPressableByText(renderer, '+')!);
+        expect(allText(renderer)).not.toContain('Total:');
+        press(findPressableByText(renderer, '50')!);
+        expect(allText(renderer)).toContain('Total: 125');
+        press(findPressableByText(renderer, 'Backspace')!);
+        press(findPressableByText(renderer, '6')!);
+        expect(allText(renderer)).toContain('Total: 81');
+        press(findPressableByText(renderer, 'Clear')!);
+        press(findPressableByText(renderer, '50')!);
+        expect(allText(renderer)).toContain('Total: 50');
+        expect(findPressableByText(renderer, 'Show total (-10 pts)')).toBeUndefined();
+        expect(onHint).not.toHaveBeenCalled();
+    });
+
+    it.each([
+        { tiles: [], disabled: true },
+        { tiles: ['75', '+'], disabled: true },
+        { tiles: ['75', '50'], disabled: true },
+        { tiles: ['75', '÷', '(', '3', '-', '2', '-', '1', ')'], disabled: true },
+        { tiles: ['6', '×', '(', '50', '+', '1', ')'], disabled: false },
+    ])('only submits valid expressions $tiles', ({ tiles, disabled }) => {
+        const onSubmit = vi.fn();
+        const renderer = render(
+            <CountdownPuzzleView
+                {...interactionProps}
+                puzzle={countdownPuzzle()}
+                onSubmit={onSubmit}
+            />
+        );
+        for (const tile of tiles) press(findPressableByText(renderer, tile)!);
+        const submit = findPressableByText(renderer, 'Submit')!;
+        expect(submit.props.disabled).toBe(disabled);
+        press(submit);
+        if (disabled) expect(onSubmit).not.toHaveBeenCalled();
+        else expect(onSubmit).toHaveBeenCalledWith(JSON.stringify(tiles));
     });
 
     it('disables used number tiles and frees them on backspace', () => {

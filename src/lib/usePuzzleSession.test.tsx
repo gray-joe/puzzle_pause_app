@@ -1,8 +1,9 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { AttemptResponse, Puzzle } from '../api/schemas';
-import { render, update } from '../test/render';
+import type { AttemptResponse, CountdownPuzzle, Puzzle } from '../api/schemas';
+import { allText, findPressableByText, press, render, update } from '../test/render';
+import { CountdownPuzzleView } from '../components/puzzle/CountdownPuzzle';
 import { usePuzzleSession } from './usePuzzleSession';
 import { clearPuzzleDraft } from './puzzleDrafts';
 
@@ -46,14 +47,19 @@ async function step(action: () => void) {
         await new Promise((resolve) => setTimeout(resolve, 10));
     });
 }
-function mount(scope: 'today' | 'archive') {
+function mount(scope: 'today' | 'archive', renderCountdown = false) {
     const client = new QueryClient({ defaultOptions: { mutations: { retry: false } } });
     const invalidate = vi.spyOn(client, 'invalidateQueries');
     let game!: ReturnType<typeof usePuzzleSession>;
     type Input = Parameters<typeof usePuzzleSession>[0];
     function Capture(props: Input) {
         game = usePuzzleSession(props);
-        return null;
+        return renderCountdown && props.puzzle?.puzzle_type === 'countdown' ? (
+            <CountdownPuzzleView
+                puzzle={props.puzzle as CountdownPuzzle}
+                {...game.interactionProps}
+            />
+        ) : null;
     }
     const props: Input = { puzzle, token: 'token', owner: 'user:42', scope };
     const element = (input: Input) => (
@@ -68,6 +74,7 @@ function mount(scope: 'today' | 'archive') {
     });
     return {
         game: () => game,
+        renderer: view,
         invalidate,
         change: (next: Partial<Input>) => update(view, element({ ...props, ...next })),
     };
@@ -97,6 +104,65 @@ describe.each(['today', 'archive'] as const)('%s shared gameplay lifecycle', (sc
             expect(view.game().interactionProps.submitError).toContain('Highlighted squares');
             view.change({ puzzle: { ...grid, id: 12 } });
             expect(view.game().interactionProps.gridFeedback).toBeUndefined();
+        }
+    );
+
+    it.each([false, true])(
+        'charges Countdown total once and submits expression tiles for guest=%s',
+        async (guest) => {
+            const calls = api[scope];
+            const view = mount(scope, true);
+            view.change({
+                puzzle: {
+                    ...puzzle,
+                    puzzle_type: 'countdown',
+                    question: {
+                        prompt: 'Reach the target',
+                        target: 306,
+                        numbers: [75, 50, 6, 3, 2, 1],
+                        operators: ['+', '-', '×', '÷'],
+                    },
+                    total_hints: 1,
+                } as Puzzle,
+                token: guest ? null : 'token',
+                owner: guest ? 'guest' : 'user:42',
+            });
+            for (const tile of ['6', '×', '(', '50', '+', '1', ')'])
+                press(findPressableByText(view.renderer, tile)!);
+            expect(allText(view.renderer)).not.toContain('Total:');
+            calls.hint.mockRejectedValueOnce(new Error('Offline'));
+            await step(() => press(findPressableByText(view.renderer, 'Show total (-10 pts)')!));
+            expect(allText(view.renderer)).not.toContain('Total:');
+            expect(view.game().interactionProps.hintError).toContain('Could not reveal');
+            expect(view.game().progressProps.progressMetadata?.hint_used).toBe(0);
+
+            calls.hint.mockResolvedValueOnce({ hint: 'Running total enabled', total_hints: 1 });
+            await step(() => {
+                press(findPressableByText(view.renderer, 'Show total (-10 pts)')!);
+                view.game().interactionProps.onHint();
+            });
+            expect(calls.hint).toHaveBeenCalledTimes(2);
+            expect(calls.hint).toHaveBeenLastCalledWith(guest ? null : 'token', 11, 0);
+            expect(allText(view.renderer)).toContain('Total: 306');
+            expect(view.game().interactionProps.hintError).toBe('');
+            expect(view.game().interactionProps.canHint).toBe(false);
+            expect(findPressableByText(view.renderer, 'Show total (-10 pts)')).toBeUndefined();
+            calls.attempt.mockResolvedValueOnce({
+                ...response,
+                correct: true,
+                solved: true,
+                score: scope === 'archive' ? 80 : 90,
+            });
+            await step(() => press(findPressableByText(view.renderer, 'Submit')!));
+            expect(calls.attempt).toHaveBeenCalledWith(
+                guest ? null : 'token',
+                11,
+                JSON.stringify(['6', '×', '(', '50', '+', '1', ')']),
+                null,
+                0,
+                1
+            );
+            expect(view.game().localResult?.solved).toBe(true);
         }
     );
 
