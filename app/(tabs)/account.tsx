@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Alert, Pressable, Text, View } from 'react-native';
+import { clearAccountPuzzleDrafts } from '../../src/lib/puzzleDrafts';
 import * as accountApi from '../../src/api/account';
 import { ApiError } from '../../src/api/client';
 import type { AccountStats } from '../../src/api/schemas';
@@ -32,10 +33,27 @@ export default function AccountScreen() {
 
     const deleteMutation = useMutation({
         mutationFn: () => accountApi.delete(token!),
-        onSuccess: () => {
+        onSuccess: async () => {
+            const deletedUserId = session!.user.id;
             setDeleteError('');
             setConfirmDelete(false);
-            void signOut();
+            try {
+                await signOut();
+            } catch {
+                Alert.alert(
+                    'Account deleted',
+                    'The account was deleted, but sign-out could not finish. Please restart the app.'
+                );
+            } finally {
+                try {
+                    await clearAccountPuzzleDrafts(deletedUserId);
+                } catch {
+                    Alert.alert(
+                        'Local cleanup failed',
+                        'Your account was deleted, but its device drafts could not be removed. Clear this app’s storage to remove them.'
+                    );
+                }
+            }
             router.replace('/(auth)/email');
             (router as typeof router & { refresh?: () => void }).refresh?.();
         },

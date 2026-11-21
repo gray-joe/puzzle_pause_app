@@ -86,6 +86,16 @@ export const puzzleDraftRepository: PuzzleDraftRepository = {
     },
 };
 
+export async function clearAccountPuzzleDrafts(userId: number) {
+    const prefix = `pp_draft_v1:${encodeURIComponent(`user:${userId}`)}:`;
+    const keys = new Set([...(await AsyncStorage.getAllKeys()), ...pending.keys()]);
+    await Promise.all(
+        [...keys]
+            .filter((storageKey) => storageKey.startsWith(prefix))
+            .map((storageKey) => enqueue(storageKey, () => AsyncStorage.removeItem(storageKey)))
+    );
+}
+
 export function clearPuzzleDraft(owner: string, puzzleId: number) {
     return puzzleDraftRepository.remove({ owner, puzzleId });
 }

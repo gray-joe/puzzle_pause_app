@@ -1357,6 +1357,11 @@ describe('account route', () => {
             },
         });
         mocks.deleteAccount.mockReturnValueOnce({ message: 'Account deleted successfully' });
+        vi.mocked(AsyncStorage.getAllKeys).mockResolvedValueOnce([
+            'pp_draft_v1:user%3A7:11',
+            'pp_draft_v1:user%3A70:11',
+            'pp_draft_v1:guest:11',
+        ]);
         const { default: AccountScreen } = await import('../app/(tabs)/account');
         const renderer = render(<AccountScreen />);
 
@@ -1365,10 +1370,30 @@ describe('account route', () => {
 
         press(findPressableByText(renderer, 'Yes, delete my account')!);
 
+        await act(async () => {});
         expect(mocks.deleteAccount).toHaveBeenCalledWith('jwt-token');
         expect(mocks.signOut).toHaveBeenCalledTimes(1);
+        expect(AsyncStorage.removeItem).toHaveBeenCalledWith('pp_draft_v1:user%3A7:11');
+        expect(AsyncStorage.removeItem).not.toHaveBeenCalledWith('pp_draft_v1:user%3A70:11');
+        expect(AsyncStorage.removeItem).not.toHaveBeenCalledWith('pp_draft_v1:guest:11');
         expect(routerMock.replace).toHaveBeenCalledWith('/(auth)/email');
         expect(routerMock.refresh).toHaveBeenCalledTimes(1);
+    });
+
+    it('warns when account deletion succeeds but device cleanup fails', async () => {
+        mocks.deleteAccount.mockReturnValueOnce({ message: 'Deleted' });
+        vi.mocked(AsyncStorage.getAllKeys).mockRejectedValueOnce(new Error('storage unavailable'));
+        const { default: AccountScreen } = await import('../app/(tabs)/account');
+        const view = render(<AccountScreen />);
+        press(findPressableByText(view, 'Delete account')!);
+        press(findPressableByText(view, 'Yes, delete my account')!);
+        await act(async () => {});
+        expect(Alert.alert).toHaveBeenCalledWith(
+            'Local cleanup failed',
+            expect.stringContaining('Clear this app’s storage')
+        );
+        expect(routerMock.replace).toHaveBeenCalledWith('/(auth)/email');
+        act(() => view.unmount());
     });
 
     it('dismisses confirmation and shows an error when deletion fails', async () => {

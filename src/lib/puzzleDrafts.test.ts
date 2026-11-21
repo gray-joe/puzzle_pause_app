@@ -1,6 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { puzzleDraftRepository as repository, type PuzzleDraft } from './puzzleDrafts';
+import {
+    puzzleDraftRepository as repository,
+    clearAccountPuzzleDrafts,
+    type PuzzleDraft,
+} from './puzzleDrafts';
 
 const identity = { owner: 'user:42', puzzleId: 3 };
 const draft: PuzzleDraft = {
@@ -14,6 +18,7 @@ const draft: PuzzleDraft = {
 let disk: Map<string, string>;
 beforeEach(() => {
     disk = new Map();
+    vi.mocked(AsyncStorage.getAllKeys).mockImplementation(async () => [...disk.keys()]);
     vi.mocked(AsyncStorage.getItem).mockImplementation(async (key) => disk.get(key) ?? null);
     vi.mocked(AsyncStorage.setItem).mockImplementation(async (key, value) => {
         disk.set(key, value);
@@ -30,6 +35,34 @@ describe('puzzle draft repository', () => {
         expect(await repository.load({ ...identity, owner: 'guest' })).toBeNull();
         expect(await repository.load({ ...identity, owner: 'user:43' })).toBeNull();
         expect(await repository.load({ ...identity, puzzleId: 4 })).toBeNull();
+    });
+    it('deletes only the requested account’s drafts', async () => {
+        await repository.save(draft);
+        await repository.save({ ...draft, puzzleId: 4 });
+        await repository.save({ ...draft, owner: 'user:420' });
+        await repository.save({ ...draft, owner: 'guest' });
+        disk.set('unrelated-preference', 'keep');
+        await clearAccountPuzzleDrafts(42);
+        expect(await repository.load(identity)).toBeNull();
+        expect(await repository.load({ ...identity, puzzleId: 4 })).toBeNull();
+        expect(await repository.load({ ...identity, owner: 'user:420' })).not.toBeNull();
+        expect(await repository.load({ ...identity, owner: 'guest' })).not.toBeNull();
+        expect(disk.get('unrelated-preference')).toBe('keep');
+    });
+    it('also deletes account drafts whose first write is still queued', async () => {
+        let release!: () => void;
+        vi.mocked(AsyncStorage.setItem).mockImplementationOnce(async (key, value) => {
+            await new Promise<void>((resolve) => {
+                release = resolve;
+            });
+            disk.set(key, value);
+        });
+        const writing = repository.save(draft);
+        await vi.waitFor(() => expect(release).toBeTypeOf('function'));
+        const deleting = clearAccountPuzzleDrafts(42);
+        release();
+        await Promise.all([writing, deleting]);
+        expect(await repository.load(identity)).toBeNull();
     });
     it('discards corrupted and incompatible records', async () => {
         for (const value of [
