@@ -25,6 +25,7 @@ import {
 import { ApiError } from './api/client';
 import type { Puzzle, User } from './api/schemas';
 import { clearGuestPuzzleStateForTest, setGuestPuzzleResult } from './lib/guestPuzzleState';
+import * as guestPuzzleState from './lib/guestPuzzleState';
 
 const mocks = vi.hoisted(() => {
     const queryData = new Map<string, unknown>();
@@ -1510,6 +1511,47 @@ describe('league routes', () => {
             queryKey: ['leagues', 'detail', 3, 'jwt-token'],
         });
         expect(routerMock.back).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe.each(['today', 'archive'] as const)('%s guest result ownership', (scope) => {
+    it('ignores guest storage results after the owner changes', async () => {
+        setSession(null);
+        localSearchParamsMock.mockReturnValue({ id: String(wordPuzzle.id) });
+        mocks.useQuery.mockImplementation((options) => ({
+            data: ['today', 'detail'].includes(options.queryKey[1]) ? wordPuzzle : undefined,
+            isLoading: false,
+            error: null,
+            refetch: mocks.refetch,
+        }));
+        let finish!: (value: any) => void;
+        const lookup = vi
+            .spyOn(guestPuzzleState, 'getGuestPuzzleResultAsync')
+            .mockImplementationOnce(
+                () =>
+                    new Promise((resolve) => {
+                        finish = resolve;
+                    })
+            );
+        const Component =
+            scope === 'today'
+                ? (await import('./screens/TodayPuzzleScreen')).TodayPuzzleScreen
+                : (await import('../app/(tabs)/archive/[id]')).default;
+        const view = render(<Component />);
+        setSession();
+        update(view, <Component />);
+        await act(async () => {
+            finish({
+                solved: true,
+                correct: true,
+                answer: 'PRIVATE GUEST ANSWER',
+                incorrect_guesses: 0,
+            });
+        });
+        expect(allText(view)).not.toContain('PRIVATE GUEST ANSWER');
+        expect(findPressableByText(view, 'Submit')).toBeDefined();
+        act(() => view.unmount());
+        lookup.mockRestore();
     });
 });
 

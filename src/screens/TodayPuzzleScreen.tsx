@@ -124,6 +124,7 @@ export function TodayPuzzleScreen() {
     const currentOpenedAt = sessionOpenedAt ?? puzzle?.attempt?.opened_at ?? null;
 
     useEffect(() => {
+        let active = true;
         if (puzzle) {
             const hasServerCompletion = puzzle.attempt?.solved || puzzle.attempt?.gave_up;
             const storedGuestResult =
@@ -132,7 +133,7 @@ export function TodayPuzzleScreen() {
             if (storedGuestResult) void clearPuzzleDraft('guest', puzzle.id).catch(() => {});
             if (!token && !hasServerCompletion && !storedGuestResult) {
                 getGuestPuzzleResultAsync(puzzle.id).then((result) => {
-                    if (result) {
+                    if (active && result) {
                         void clearPuzzleDraft('guest', puzzle.id).catch(() => {});
                         setGuestResult((current) => current ?? result);
                     }
@@ -159,6 +160,9 @@ export function TodayPuzzleScreen() {
         setSessionOpenedAt(null);
         setSubmitError('');
         setHintError('');
+        return () => {
+            active = false;
+        };
     }, [
         queryClient,
         token,

@@ -171,6 +171,7 @@ export default function ArchiveDetailScreen() {
     }, [draftOwner, puzzle?.id, puzzle?.solved, puzzle?.attempt?.solved, puzzle?.attempt?.gave_up]);
 
     useEffect(() => {
+        let active = true;
         if (puzzle) {
             const hasServerCompletion = puzzle.attempt?.solved || puzzle.attempt?.gave_up;
             const storedGuestResult =
@@ -179,7 +180,7 @@ export default function ArchiveDetailScreen() {
             if (storedGuestResult) void clearPuzzleDraft('guest', puzzle.id).catch(() => {});
             if (!token && !hasServerCompletion && !storedGuestResult) {
                 getGuestPuzzleResultAsync(puzzle.id).then((result) => {
-                    if (result) {
+                    if (active && result) {
                         void clearPuzzleDraft('guest', puzzle.id).catch(() => {});
                         setGuestResult((current) => current ?? result);
                     }
@@ -206,6 +207,9 @@ export default function ArchiveDetailScreen() {
         setSessionOpenedAt(null);
         setSubmitError('');
         setHintError('');
+        return () => {
+            active = false;
+        };
     }, [
         queryClient,
         token,
