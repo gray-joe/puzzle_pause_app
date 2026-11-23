@@ -1,4 +1,5 @@
 import React from 'react';
+import { AccessibilityInfo } from 'react-native';
 import { act, type ReactTestInstance } from 'react-test-renderer';
 import { describe, expect, it, vi } from 'vitest';
 import { PuzzleSchema, type Puzzle } from '../../api/schemas';
@@ -65,6 +66,23 @@ function renderPuzzle(p: Puzzle, feedback?: PuzzleInteractionProps['gridFeedback
 }
 
 describe('GridBoard accessibility', () => {
+    it('distinguishes visible conflicts from submitted errors, including on read-only givens', () => {
+        const view = render(
+            <GridBoard
+                cols={1}
+                cells={[
+                    { value: '7', given: true, error: true, conflict: 'Duplicate 7 in row 1.' },
+                ]}
+            />
+        );
+        const cell = findAllByHost(view, 'Pressable')[0]!;
+        expect(cell.props.accessibilityValue.text).toContain(
+            'Submitted error, Duplicate 7 in row 1.'
+        );
+        expect(cell.props.accessibilityValue.text).toContain('given, not editable');
+        expect(cell.props.disabled).toBe(true);
+        act(() => view.unmount());
+    });
     it('announces values, clue/code numbers, givens, editability and selection', () => {
         const view = render(
             <GridBoard
@@ -243,6 +261,68 @@ describe('multi-character grid input', () => {
 });
 
 describe('SudokuPuzzleView', () => {
+    it.each([
+        [1, 6, 'row 1'],
+        [6, 1, 'column 1'],
+        [2, 2, 'box 1'],
+    ])('describes live duplicates including givens at %i,%i in %s', (r, c, unit) => {
+        vi.mocked(AccessibilityInfo.announceForAccessibility).mockClear();
+        const { renderer, type, cell, backspace, onSubmit } = renderPuzzle(
+            puzzle('sudoku', { prompt: '', grid: '7' + '0'.repeat(80) })
+        );
+        press(cell(r, c));
+        type('7');
+        for (const affected of [cell(1, 1), cell(r, c)]) {
+            expect(affected.props.accessibilityValue.text).toContain(`Duplicate 7 in ${unit}.`);
+            expect(affected.props.accessibilityValue.text).not.toContain('Submitted error');
+        }
+        expect(cell(1, 1).props.disabled).toBe(true);
+        expect(findByHost(renderer, 'TextInput').props.accessibilityHint).toBe(
+            `Duplicate 7 in ${unit}.`
+        );
+        expect(allText(renderer)).toContain('2 cells have duplicate digits.');
+        expect(AccessibilityInfo.announceForAccessibility).toHaveBeenCalledTimes(1);
+        type('7');
+        expect(AccessibilityInfo.announceForAccessibility).toHaveBeenCalledTimes(1);
+        backspace();
+        expect(cell(1, 1).props.accessibilityValue.text).not.toContain('Duplicate');
+        expect(cell(r, c).props.accessibilityValue.text).not.toContain('Duplicate');
+        expect(allText(renderer)).toContain('No duplicate digits.');
+        expect(AccessibilityInfo.announceForAccessibility).toHaveBeenLastCalledWith(
+            'No duplicate digits.'
+        );
+        expect(onSubmit).not.toHaveBeenCalled();
+    });
+
+    it('updates conflicts after multi-digit paste and clears them on deletion', () => {
+        const { renderer, cell, backspace } = renderPuzzle(
+            puzzle('sudoku', { prompt: '', grid: '0'.repeat(81) })
+        );
+        changeText(findByHost(renderer, 'TextInput'), '77');
+        expect(cell(1, 1).props.accessibilityValue.text).toContain('Duplicate 7 in row 1.');
+        expect(cell(1, 2).props.accessibilityValue.text).toContain('Duplicate 7 in box 1.');
+        press(cell(1, 2)); // Paste advances to the next blank; delete the conflicting entry.
+        backspace();
+        expect(cell(1, 1).props.accessibilityValue.text).not.toContain('Duplicate');
+        expect(cell(1, 2).props.accessibilityValue.text).not.toContain('Duplicate');
+    });
+
+    it('does not flag an isolated digit or suppress submission of a full conflicting board', () => {
+        const { type, cell, onSubmit, submit } = renderPuzzle(
+            puzzle('sudoku', { prompt: '', grid: '0'.repeat(81) })
+        );
+        type('7');
+        expect(cell(1, 1).props.accessibilityValue.text).not.toContain('Duplicate');
+        for (let r = 1; r <= 9; r++)
+            for (let c = 1; c <= 9; c++) {
+                press(cell(r, c));
+                type('7');
+            }
+        expect(submit().props.disabled).toBe(false);
+        press(submit());
+        expect(onSubmit).toHaveBeenCalledWith('7'.repeat(81));
+    });
+
     const solution =
         '534678912672195348198342567859761423426853791713924856961537284287419635345286179';
 

@@ -1,19 +1,19 @@
 import { useState } from 'react';
-import { Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 import type { WordsearchPuzzle } from '../../api/schemas';
 import { useTheme } from '../../theme';
 import { Button } from '../Button';
 import { TextInput } from '../TextInput';
 import type { PuzzleInteractionProps } from './PuzzleRenderer';
+import {
+    findWordInGrid,
+    parseWordsearchQuestion,
+    wordLocation,
+    wordsearchAnswers,
+} from '../../lib/wordsearch';
+import { GridBoard } from './grid';
 
 type Props = { puzzle: WordsearchPuzzle } & PuzzleInteractionProps;
-
-type ParsedWordsearch = {
-    gridText: string;
-    findLine: string;
-    themeLine?: string;
-    inputCount: number;
-};
 
 export function WordsearchPuzzleView({
     puzzle,
@@ -28,7 +28,8 @@ export function WordsearchPuzzleView({
     const parsed = parseWordsearchQuestion(puzzle.question);
     const [words, setWords] = useState(() => Array.from({ length: parsed.inputCount }, () => ''));
     const { colors, spacing, typography } = useTheme();
-    const isComplete = words.every((word) => word.trim());
+    const entered = words.filter((word) => word.trim()).length;
+    const isComplete = entered === words.length;
 
     const updateWord = (index: number, value: string) => {
         const normalized = value.replace(/[^a-z]/gi, '').toUpperCase();
@@ -36,11 +37,11 @@ export function WordsearchPuzzleView({
     };
 
     const handleSubmit = () => {
-        if (isComplete) onSubmit(words.map((word) => word.trim()).join(' '));
+        if (isComplete && !isSubmitting) onSubmit(words.map((word) => word.trim()).join(' '));
     };
 
     return (
-        <View style={{ gap: spacing.lg }}>
+        <View style={{ gap: spacing.sm }}>
             <View style={{ gap: spacing.xs }}>
                 <Text style={[typography.caption, { color: colors.textMuted }]}>
                     #{puzzle.puzzle_number} · {puzzle.puzzle_name}
@@ -61,19 +62,24 @@ export function WordsearchPuzzleView({
                     borderColor: colors.border,
                 }}
             >
-                <Text
-                    style={[
-                        typography.body,
-                        {
-                            color: colors.text,
-                            fontFamily: 'Courier',
-                            lineHeight: 28,
-                            textAlign: 'center',
-                        },
-                    ]}
+                <ScrollView
+                    horizontal
+                    contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}
                 >
-                    {parsed.gridText}
-                </Text>
+                    <Text
+                        style={[
+                            typography.body,
+                            {
+                                color: colors.text,
+                                fontFamily: 'Courier',
+                                lineHeight: 28,
+                                textAlign: 'center',
+                            },
+                        ]}
+                    >
+                        {parsed.gridText}
+                    </Text>
+                </ScrollView>
             </View>
 
             <View style={{ gap: spacing.xs }}>
@@ -93,20 +99,48 @@ export function WordsearchPuzzleView({
                 )}
             </View>
 
-            <View style={{ gap: spacing.sm }}>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
                 {words.map((word, index) => (
-                    <TextInput
+                    <View
                         key={index}
-                        label={words.length === 1 ? 'Found word' : `Found word ${index + 1}`}
-                        value={word}
-                        onChangeText={(value) => updateWord(index, value)}
-                        autoCorrect={false}
-                        autoCapitalize="characters"
-                        returnKeyType={index === words.length - 1 ? 'done' : 'next'}
-                        onSubmitEditing={index === words.length - 1 ? handleSubmit : undefined}
-                        editable={!isSubmitting}
-                    />
+                        style={{ width: words.length === 1 ? '100%' : '47%', flexGrow: 1 }}
+                    >
+                        <TextInput
+                            accessibilityLabel={`Found word ${index + 1}`}
+                            placeholder={`Word ${index + 1}`}
+                            value={word}
+                            onChangeText={(value) => updateWord(index, value)}
+                            autoCorrect={false}
+                            autoCapitalize="characters"
+                            returnKeyType="done"
+                            onSubmitEditing={handleSubmit}
+                            editable={!isSubmitting}
+                            style={{ minHeight: 44, paddingHorizontal: spacing.sm }}
+                        />
+                    </View>
                 ))}
+            </View>
+            <View
+                style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    flexWrap: 'wrap',
+                    justifyContent: 'space-between',
+                    gap: spacing.sm,
+                }}
+            >
+                <Text
+                    accessibilityLiveRegion="polite"
+                    style={[typography.caption, { color: colors.textMuted }]}
+                >
+                    {entered} of {words.length} entered
+                </Text>
+                <Button
+                    title="Submit"
+                    onPress={handleSubmit}
+                    loading={isSubmitting}
+                    disabled={!isComplete}
+                />
             </View>
 
             {hintsRevealed.length > 0 && (
@@ -131,12 +165,6 @@ export function WordsearchPuzzleView({
             )}
 
             <View style={{ gap: spacing.sm }}>
-                <Button
-                    title="Submit"
-                    onPress={handleSubmit}
-                    loading={isSubmitting}
-                    disabled={!isComplete}
-                />
                 {canHint && (
                     <Button title="Hint" variant="secondary" onPress={onHint} loading={isHinting} />
                 )}
@@ -145,19 +173,67 @@ export function WordsearchPuzzleView({
     );
 }
 
-function parseWordsearchQuestion(question: string): ParsedWordsearch {
-    const lines = question.split(/\r?\n/).map((line) => line.trimEnd());
-    const findLine = lines.find((line) => /^Find:/i.test(line)) ?? 'Find:';
-    const themeLine = lines.find((line) => /^Theme:/i.test(line));
-    const gridLines = lines.filter((line) => !/^Find:/i.test(line) && !/^Theme:/i.test(line));
-    const findValue = findLine.replace(/^Find:\s*/i, '').trim();
-    const parsedCount = Number(findValue);
-    const inputCount = Number.isInteger(parsedCount) && parsedCount > 0 ? parsedCount : 1;
-
-    return {
-        gridText: gridLines.join('\n'),
-        findLine,
-        themeLine,
-        inputCount,
-    };
+export function WordsearchSolution({ question, answer }: { question: string; answer: string }) {
+    const { colors, spacing, typography } = useTheme();
+    const { grid } = parseWordsearchQuestion(question);
+    const [selected, setSelected] = useState<string | null>(null);
+    const paths = wordsearchAnswers(answer).map((word) => ({
+        word,
+        cells: grid ? findWordInGrid(grid, word) : null,
+    }));
+    const highlighted = new Set(
+        paths
+            .filter(({ word }) => selected === null || word === selected)
+            .flatMap(({ cells }) => cells?.map(({ r, c }) => `${r},${c}`) ?? [])
+    );
+    return (
+        <View style={{ gap: spacing.sm }}>
+            {grid && (
+                <GridBoard
+                    cols={grid[0].length}
+                    cells={grid.flatMap((row, r) =>
+                        row.map((value, c) => ({
+                            value,
+                            highlighted: highlighted.has(`${r},${c}`),
+                            selected: selected !== null && highlighted.has(`${r},${c}`),
+                        }))
+                    )}
+                />
+            )}
+            <Text style={[typography.caption, { color: colors.textMuted }]}>
+                Select a word to isolate its path; select it again to show all words.
+            </Text>
+            {paths.map(({ word, cells }) => (
+                <Pressable
+                    key={word}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${word}. ${wordLocation(cells)}`}
+                    accessibilityState={{ selected: selected === word }}
+                    onPress={() => setSelected(selected === word ? null : word)}
+                    style={{
+                        minHeight: 44,
+                        padding: spacing.sm,
+                        borderWidth: selected === word ? 2 : 1,
+                        borderColor: selected === word ? colors.primary : colors.border,
+                        borderRadius: 4,
+                    }}
+                >
+                    <Text style={[typography.body, { color: colors.text, fontWeight: '700' }]}>
+                        {word}
+                    </Text>
+                    <Text style={[typography.caption, { color: colors.textMuted }]}>
+                        {wordLocation(cells)}
+                    </Text>
+                </Pressable>
+            ))}
+            <Text
+                accessibilityLiveRegion="polite"
+                style={[typography.caption, { color: colors.textMuted }]}
+            >
+                {selected
+                    ? `${selected}: ${wordLocation(paths.find(({ word }) => word === selected)?.cells ?? null)}`
+                    : 'Showing all word locations.'}
+            </Text>
+        </View>
+    );
 }

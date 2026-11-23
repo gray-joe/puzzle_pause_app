@@ -18,6 +18,7 @@ export type GridCell = {
     selected?: boolean;
     highlighted?: boolean;
     error?: boolean;
+    conflict?: string;
 };
 
 const MAX_CELL = 44;
@@ -66,7 +67,7 @@ export function GridBoard({
                                 ? scheme === 'dark'
                                     ? '#000000'
                                     : colors.text
-                                : cell.error
+                                : cell.error || cell.conflict
                                   ? `${colors.error}33`
                                   : cell.selected
                                     ? `${colors.primary}66`
@@ -91,6 +92,7 @@ export function GridBoard({
                                                   text: [
                                                       cell.value || 'Empty',
                                                       cell.error ? 'Submitted error' : '',
+                                                      cell.conflict ?? '',
                                                       cell.label != null
                                                           ? `number ${cell.label}`
                                                           : '',
@@ -125,7 +127,7 @@ export function GridBoard({
                                         borderWidth: cell.selected ? 2 : cell.black ? 0 : 1,
                                         borderColor: cell.selected
                                             ? colors.primary
-                                            : cell.error
+                                            : cell.error || cell.conflict
                                               ? colors.error
                                               : colors.border,
                                         backgroundColor: background,
@@ -176,12 +178,14 @@ export const GridKeyInput = forwardRef<
         onBackspace: () => void;
         numeric?: boolean;
         editable?: boolean;
+        accessibilityHint?: string;
     }
->(function GridKeyInput({ onText, onBackspace, numeric, editable }, ref) {
+>(function GridKeyInput({ onText, onBackspace, numeric, editable, accessibilityHint }, ref) {
     return (
         <RNTextInput
             ref={ref}
             accessibilityLabel="Puzzle grid keyboard"
+            accessibilityHint={accessibilityHint}
             value=""
             onChangeText={(text) => onText(text.toUpperCase())}
             onKeyPress={(event) => {

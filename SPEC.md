@@ -156,7 +156,7 @@ Behavioral notes:
 | `word-wheel` | JSON `{ prompt, wheels: { letters: (string\|null)[] }[] }` | space-separated found words |
 | `scrabble` | JSON `{ prompt, board: (string\|null)[], modifiers: (string\|null)[], rack: string[] }` | trimmed `"word score"` string, e.g. `"mask 10"` |
 | `numgrid` | JSON `{ prompt, grid: (number\|null)[] }` (exactly one `null` cell) | trimmed numeric string |
-| `wordsearch` | string containing a `Find:` section | space-separated found words |
+| `wordsearch` | letter-grid rows with `Find: N` (word count) or legacy `Find: WORD` (one field), optional `Theme:` line | space-separated found words |
 | `match` | JSON `{ prompt, left: string[], right: string[] }` (equal length) | comma-separated index mapping, one entry per `left` item |
 | `connections` | JSON `{ prompt, items: string[], categories?: string[] }` | pipe-delimited group assignment (see `ConnectionsPuzzle.tsx`) |
 | `chess` | JSON `{ fen: string }` | lowercase UCI move string, e.g. `"e2e4"`, with promotion suffix when applicable (e.g. `"e7e8q"`) |
@@ -176,6 +176,25 @@ Daily and archive play submit the expression as a JSON string array of number/op
 **Show total (-10 pts)** and **Hint** use the same hint endpoint and unlock the same running total. Totals remain hidden until a hint request succeeds; failed/offline requests do not unlock them. Once purchased, the total remains available through edits, backspace and Clear. Restored `revealed_hint` also restores the total without a second purchase. Countdown always exposes at least one hint (`"Running total enabled"` when no authored hint exists). Guest attempts carry the local `hints_used` penalty; authenticated attempts use the server's persisted hint count.
 
 The mobile fix uses the existing backend/web contract; no new endpoint, response field or database migration is required. Older mobile builds submitting numeric totals remain incompatible and need a client update; do not relax backend expression validation to accommodate them.
+
+### Wordsearch play and revealed locations
+
+The mobile and web players use a compact two-column answer list, uniquely labelled
+fields, an **X of N entered** counter beside Submit, and retain entries after wrong or
+failed requests. The counter measures non-empty fields, not correctness; all fields
+are required before submission. Mobile inputs retain at least 44-point height and
+large result grids scroll horizontally. Wordsearch does not gain persistent drafts
+from this change; only in-session retry behavior is covered.
+
+Daily/archive results, including give-up, render the revealed grid and highlight words
+in all eight straight-line directions. Select a word to isolate its path, and select it
+again to show all paths. Each word also has visible start/end row and column coordinates
+for non-colour and screen-reader use. The first valid occurrence is used if a word appears
+more than once: the API does not carry authored coordinates. Invalid/ragged grids or
+missing words keep the answer list with **Location unavailable** rather than failing
+the result screen. This uses the existing revealed `answer`/`question`, not a new API field;
+no schema, backend rollout or database change is needed. It does not add live answer
+validation or reveal locations before completion.
 
 ### Ladder blank count
 
@@ -256,7 +275,22 @@ These are admin-editor features, not new play API fields. In particular:
 
 ### Grid play feedback
 
-Both web and mobile distinguish the selected square from the highlighted Crossword entry or Codeword code group. Sudoku highlights the selected row and column. Codeword lists A–Z letters not currently assigned, including starter letters as used; erasing an assignment restores its letter to the unused list. Failed submissions highlight server-reported cells and announce errors accessibly. Editing clears the old grid highlights until the next submission; feedback is session-only, not saved in drafts. Dictionary feedback can identify a rejected word, not which individual letter is wrong. Normal wrong-guess penalties still apply.
+Sudoku on both clients flags repeated visible digits as players type, delete, paste or
+restore a draft. Every conflicting cell is marked, including givens, with descriptions
+such as **Duplicate 7 in row 1** or **Duplicate 7 in box 1**. Multiple affected units are
+reported separately. Web cells expose `aria-invalid` and associated conflict descriptions;
+mobile cells expose conflict text in their accessible value, and the keyboard input
+provides the selected cell's conflict hint. Changed summaries use an Android live region
+and explicit iOS accessibility announcements, without repeating an unchanged warning.
+
+This uses only entries/givens, never the solution. An isolated incorrect digit is not
+flagged. Duplicates are allowed during editing and autosave, and do not disable a complete
+board's Submit button or cause an attempt/hint request or penalty. Correction/deletion
+recomputes warnings immediately. Live warnings are independent of submission errors and
+are derived on restoration rather than stored in drafts. There is no new wire field,
+backend rollout or database change.
+
+Both web and mobile distinguish the selected square from the highlighted Crossword entry or Codeword code group. Sudoku highlights the selected row and column. Codeword lists A–Z letters not currently assigned, including starter letters as used; erasing an assignment restores its letter to the unused list. Failed submissions highlight server-reported cells and announce errors accessibly. Editing clears the old submitted-error highlights until the next submission; submitted feedback is session-only, not saved in drafts. Sudoku live duplicate warnings may remain after an edit if a visible conflict still exists. Dictionary feedback can identify a rejected word, not which individual letter is wrong. Normal wrong-guess penalties still apply.
 
 ### Other compatibility follow-ups
 

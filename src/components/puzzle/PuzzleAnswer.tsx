@@ -5,6 +5,7 @@ import { formatPuzzleAnswer } from '../../lib/puzzleAnswer';
 import { useTheme } from '../../theme';
 import { GridBoard, type GridCell } from './grid';
 import { NumberSquareBoard } from './NumberSquarePuzzle';
+import { WordsearchSolution } from './WordsearchPuzzle';
 
 function answerGrid(puzzle: Puzzle, answer: string): { cols: number; cells: GridCell[] } | null {
     if (typeof puzzle.question === 'string') return null;
@@ -62,6 +63,10 @@ export function PuzzleAnswer({
     answerQuestion?: string | null;
 }) {
     const { colors, typography } = useTheme();
+
+    if (puzzle.puzzle_type === 'wordsearch') {
+        return <WordsearchSolution question={answerQuestion ?? puzzle.question} answer={answer} />;
+    }
 
     if (typeof puzzle.question !== 'string' && puzzle.puzzle_type === 'number-square') {
         const values = answer.split(',').map((value) => value.trim());

@@ -1,9 +1,11 @@
-import { useRef, useState } from 'react';
-import { TextInput as RNTextInput } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { AccessibilityInfo, Platform, Text, TextInput as RNTextInput } from 'react-native';
 import type { SudokuPuzzle } from '../../api/schemas';
 import { GridBoard, GridKeyInput, GridPuzzleFrame } from './grid';
 import type { PuzzleInteractionProps } from './PuzzleRenderer';
 import { useDraftState } from './PuzzleDraftProvider';
+import { sudokuConflicts } from '../../lib/sudoku';
+import { useTheme } from '../../theme';
 
 type Props = { puzzle: SudokuPuzzle } & PuzzleInteractionProps;
 
@@ -36,6 +38,19 @@ export function SudokuPuzzleView({ puzzle, onSubmit, ...rest }: Props) {
 
     const guess = digits.join('');
     const errors = rest.gridFeedback?.guess === guess ? rest.gridFeedback.cells : [];
+    const conflicts = sudokuConflicts(digits);
+    const conflictCount = conflicts.filter(Boolean).length;
+    const conflictMessage = conflictCount
+        ? `${conflictCount} cells have duplicate digits. ${conflicts[selected] || 'Check the affected rows, columns or boxes.'}`
+        : 'No duplicate digits.';
+    const lastAnnouncement = useRef('No duplicate digits.');
+    const { colors, typography } = useTheme();
+    useEffect(() => {
+        if (lastAnnouncement.current === conflictMessage) return;
+        lastAnnouncement.current = conflictMessage;
+        // Android uses the live region; iOS needs an explicit announcement.
+        if (Platform.OS === 'ios') AccessibilityInfo.announceForAccessibility(conflictMessage);
+    }, [conflictMessage]);
     const canSubmit = digits.every(Boolean);
     const handleSubmit = () => {
         if (!canSubmit) return;
@@ -69,10 +84,18 @@ export function SudokuPuzzleView({ puzzle, onSubmit, ...rest }: Props) {
                         selected >= 0 &&
                         (Math.floor(i / 9) === Math.floor(selected / 9) || i % 9 === selected % 9),
                     error: errors.includes(i),
+                    conflict: conflicts[i],
                 }))}
             />
+            <Text
+                accessibilityLiveRegion="polite"
+                style={[typography.caption, { color: colors.textMuted }]}
+            >
+                {conflictMessage}
+            </Text>
             <GridKeyInput
                 ref={inputRef}
+                accessibilityHint={conflicts[selected] || undefined}
                 numeric
                 onText={(text) => {
                     if (selected < 0 || isGiven(selected)) return;

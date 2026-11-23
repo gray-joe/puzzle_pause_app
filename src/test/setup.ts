@@ -45,6 +45,7 @@ const FlatList = ({ data = [], renderItem, keyExtractor, ...props }: Record<stri
 vi.mock('react-native', () => ({
     ActivityIndicator: nativeComponent('ActivityIndicator'),
     Alert: { alert: vi.fn() },
+    AccessibilityInfo: { announceForAccessibility: vi.fn() },
     AppState: { addEventListener: vi.fn(() => ({ remove: vi.fn() })) },
     Linking: { openSettings: vi.fn(() => Promise.resolve()) },
     FlatList,

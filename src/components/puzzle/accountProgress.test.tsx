@@ -11,6 +11,7 @@ import {
     allText,
     changeText,
     findByHost,
+    findAllByHost,
     findPressableByText,
     press,
     render,
@@ -110,6 +111,58 @@ afterEach(() => {
 });
 
 describe('account progress grid integration', () => {
+    it('derives live Sudoku conflicts from an account restore without submitting', async () => {
+        const restored = remote();
+        restored.entries = ['7', '', '', '', '', '7', ...Array<string>(75).fill('')];
+        vi.mocked(progressApi.getProgress).mockResolvedValue(restored);
+        const onSubmit = vi.fn();
+        const view = render(
+            <PuzzleRenderer
+                {...interaction}
+                puzzle={p()}
+                draftOwner="user:4"
+                draftToken="jwt"
+                onSubmit={onSubmit}
+            />
+        );
+        await flush();
+        const first = findAllByHost(view, 'Pressable').find(
+            (node) => node.props.accessibilityLabel === 'Row 1 column 1'
+        )!;
+        expect(first.props.accessibilityValue.text).toContain('Duplicate 7 in row 1.');
+        expect(allText(view)).toContain('2 cells have duplicate digits.');
+        expect(onSubmit).not.toHaveBeenCalled();
+        expect(progressApi.saveProgress).not.toHaveBeenCalled();
+        act(() => view.unmount());
+    });
+
+    it('recomputes Sudoku conflicts when a guest draft is reopened', async () => {
+        const props = { ...interaction, puzzle: p(), draftOwner: 'guest', onSubmit: vi.fn() };
+        const first = render(<PuzzleRenderer {...props} />);
+        await flush();
+        changeText(findByHost(first, 'TextInput'), '7');
+        press(
+            findAllByHost(first, 'Pressable').find(
+                (node) => node.props.accessibilityLabel === 'Row 1 column 6'
+            )!
+        );
+        changeText(findByHost(first, 'TextInput'), '7');
+        await flush();
+        act(() => first.unmount());
+        await flush();
+        const second = render(<PuzzleRenderer {...props} />);
+        await flush();
+        expect(allText(second)).toContain('2 cells have duplicate digits.');
+        const cell = findAllByHost(second, 'Pressable').find(
+            (node) => node.props.accessibilityLabel === 'Row 1 column 1'
+        )!;
+        expect(cell.props.accessibilityValue.text).toContain('Duplicate 7 in row 1.');
+        changeText(findByHost(second, 'TextInput'), '6');
+        expect(allText(second)).toContain('No duplicate digits.');
+        expect(props.onSubmit).not.toHaveBeenCalled();
+        expect(progressApi.getProgress).not.toHaveBeenCalled();
+        act(() => second.unmount());
+    });
     for (const fixture of fixtures) {
         it(`restores, edits and syncs ${fixture.type} with the shared API`, async () => {
             const restored = remote(fixture);
